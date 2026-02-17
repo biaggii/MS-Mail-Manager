@@ -6,6 +6,7 @@ type Email = {
   password: string
   client_id: string
   refresh_token: string
+  tab?: string
 }
 
 type Post = {
@@ -24,6 +25,14 @@ type Translations = {
   language: string
   english: string
   chinese: string
+  tabs: string
+  tabPlaceholder: string
+  addTab: string
+  renameTab: string
+  deleteTab: string
+  selectMoveTarget: string
+  moveSelected: string
+  searchByName: string
   separator: string
   chooseFile: string
   importEmails: string
@@ -32,8 +41,11 @@ type Translations = {
   exportAll: string
   batchDelete: string
   deleteAll: string
+  exportMode: string
+  exportFull: string
+  exportEmailOnly: string
   selectFileFirst: string
-  addSuccess: (count: number) => string
+  addSuccess: (count: number, tab: string) => string
   selectEmailsToDelete: string
   confirmDeleteSelected: string
   confirmDeleteAll: string
@@ -41,6 +53,13 @@ type Translations = {
   confirmExportSelected: string
   addEmailFirst: string
   confirmExportAll: string
+  selectEmailsToMove: string
+  tabNameRequired: string
+  tabExists: string
+  cannotDeleteDefaultTab: string
+  cannotRenameDefaultTab: string
+  tabRenamePrompt: (current: string) => string
+  confirmDeleteTab: (tab: string, moveTo: string) => string
   confirmDeleteEmail: (email: string) => string
   fetchTimeout: string
   fetchFailed: string
@@ -85,6 +104,14 @@ const translations: Record<Lang, Translations> = {
     language: "Language",
     english: "English",
     chinese: "Chinese",
+    tabs: "Tabs",
+    tabPlaceholder: "New tab name",
+    addTab: "Add Tab",
+    renameTab: "Rename Tab",
+    deleteTab: "Delete Tab",
+    selectMoveTarget: "Move to tab",
+    moveSelected: "Move Selected",
+    searchByName: "Search by name/email",
     separator: "Separator:",
     chooseFile: "Choose File",
     importEmails: "Import Emails",
@@ -93,8 +120,11 @@ const translations: Record<Lang, Translations> = {
     exportAll: "Export All",
     batchDelete: "Batch Delete",
     deleteAll: "Delete All",
+    exportMode: "Export",
+    exportFull: "Full rows",
+    exportEmailOnly: "Email only",
     selectFileFirst: "Please choose a file first",
-    addSuccess: (count) => `Mailbox addresses added: ${count}`,
+    addSuccess: (count, tab) => `Mailbox addresses added: ${count} (Tab: ${tab})`,
     selectEmailsToDelete: "Please select emails to delete",
     confirmDeleteSelected: "Delete selected mailboxes?",
     confirmDeleteAll: "Delete all mailboxes?",
@@ -102,6 +132,13 @@ const translations: Record<Lang, Translations> = {
     confirmExportSelected: "Export selected mailboxes?",
     addEmailFirst: "Please add mailboxes first",
     confirmExportAll: "Export all mailboxes?",
+    selectEmailsToMove: "Please select emails to move",
+    tabNameRequired: "Tab name is required",
+    tabExists: "Tab already exists",
+    cannotDeleteDefaultTab: "Default tab cannot be deleted",
+    cannotRenameDefaultTab: "Default tab cannot be renamed",
+    tabRenamePrompt: (current) => `Rename tab "${current}" to:`,
+    confirmDeleteTab: (tab, moveTo) => `Delete tab "${tab}"? Its mails will move to "${moveTo}".`,
     confirmDeleteEmail: (email) => `Delete mailbox ${email}?`,
     fetchTimeout: "Receive timeout",
     fetchFailed: "Receive failed",
@@ -144,6 +181,14 @@ const translations: Record<Lang, Translations> = {
     language: "语言",
     english: "英文",
     chinese: "中文",
+    tabs: "分组",
+    tabPlaceholder: "新分组名称",
+    addTab: "新增分组",
+    renameTab: "重命名分组",
+    deleteTab: "删除分组",
+    selectMoveTarget: "移动到分组",
+    moveSelected: "移动选中",
+    searchByName: "按用户名/邮箱搜索",
     separator: "分隔符：",
     chooseFile: "选择文件",
     importEmails: "导入邮箱",
@@ -152,8 +197,11 @@ const translations: Record<Lang, Translations> = {
     exportAll: "全部导出",
     batchDelete: "批量删除",
     deleteAll: "全部删除",
+    exportMode: "导出格式",
+    exportFull: "完整行",
+    exportEmailOnly: "仅邮箱",
     selectFileFirst: "请先选择文件解析",
-    addSuccess: (count) => `邮箱地址添加成功 共${count}条`,
+    addSuccess: (count, tab) => `邮箱地址添加成功 共${count}条 (分组: ${tab})`,
     selectEmailsToDelete: "请选择要删除的邮箱",
     confirmDeleteSelected: "确认删除选中的邮箱吗？",
     confirmDeleteAll: "确认删除所有邮箱吗？",
@@ -161,6 +209,13 @@ const translations: Record<Lang, Translations> = {
     confirmExportSelected: "确认导出选中的邮箱吗？",
     addEmailFirst: "请先添加邮箱",
     confirmExportAll: "确认导出所有邮箱吗？",
+    selectEmailsToMove: "请选择要移动的邮箱",
+    tabNameRequired: "分组名称不能为空",
+    tabExists: "分组已存在",
+    cannotDeleteDefaultTab: "默认分组不能删除",
+    cannotRenameDefaultTab: "默认分组不能重命名",
+    tabRenamePrompt: (current) => `把分组 "${current}" 重命名为：`,
+    confirmDeleteTab: (tab, moveTo) => `确认删除分组 "${tab}" 吗？分组内邮箱将移动到 "${moveTo}"。`,
     confirmDeleteEmail: (email) => `确认删除邮箱 ${email} 吗？`,
     fetchTimeout: "收取超时",
     fetchFailed: "收取失败",
@@ -200,6 +255,12 @@ const translations: Record<Lang, Translations> = {
 }
 
 const LANG_STORAGE_KEY = "uiLang"
+const MAIL_STORAGE_KEY = "localMailList"
+const TAB_STORAGE_KEY = "localMailTabs"
+const ACTIVE_TAB_STORAGE_KEY = "activeMailTab"
+const DEFAULT_TAB = "Default"
+
+type ExportMode = "full" | "email-only"
 
 function safeParseJSON<T>(value: string | null, fallback: T): T {
   if (!value) return fallback
@@ -208,6 +269,38 @@ function safeParseJSON<T>(value: string | null, fallback: T): T {
   } catch {
     return fallback
   }
+}
+
+function normalizeTabName(value: string): string {
+  const next = value.trim()
+  return next === "" ? DEFAULT_TAB : next
+}
+
+function normalizeEmail(row: Email): Email {
+  return {
+    email: (row.email || "").trim(),
+    password: (row.password || "").trim(),
+    client_id: (row.client_id || "").trim(),
+    refresh_token: (row.refresh_token || "").trim(),
+    tab: normalizeTabName(row.tab || DEFAULT_TAB),
+  }
+}
+
+function normalizeEmailList(rows: Email[]): Email[] {
+  return rows.map(normalizeEmail)
+}
+
+function normalizeTabs(input: string[]): string[] {
+  const seen = new Set<string>()
+  const output: string[] = []
+  for (const raw of [DEFAULT_TAB, ...input]) {
+    const tab = normalizeTabName(raw)
+    const key = tab.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    output.push(tab)
+  }
+  return output
 }
 
 function App() {
@@ -220,6 +313,12 @@ function App() {
   const [splitSymbol, setSplitSymbol] = useState("----")
   const [fileName, setFileName] = useState("")
   const [emailList, setEmailList] = useState<string[]>([])
+  const [tabs, setTabs] = useState<string[]>([DEFAULT_TAB])
+  const [activeTab, setActiveTab] = useState(DEFAULT_TAB)
+  const [newTabName, setNewTabName] = useState("")
+  const [moveTargetTab, setMoveTargetTab] = useState(DEFAULT_TAB)
+  const [searchKeyword, setSearchKeyword] = useState("")
+  const [exportMode, setExportMode] = useState<ExportMode>("full")
   const [mailList, setMailList] = useState<Email[]>([])
   const [selectedEmails, setSelectedEmails] = useState<string[]>([])
   const [dialogCopyVisible, setDialogCopyVisible] = useState(false)
@@ -237,21 +336,52 @@ function App() {
   const abortRef = useRef<AbortController | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(5)
-  const [editIndex, setEditIndex] = useState(-1)
+  const [editEmail, setEditEmail] = useState("")
   const [editForm, setEditForm] = useState<Email>({
     email: "",
     password: "",
     client_id: "",
     refresh_token: "",
+    tab: DEFAULT_TAB,
   })
 
   useEffect(() => {
-    setMailList(safeParseJSON<Email[]>(localStorage.getItem("localMailList"), []))
+    const storedList = normalizeEmailList(safeParseJSON<Email[]>(localStorage.getItem(MAIL_STORAGE_KEY), []))
+    const storedTabs = safeParseJSON<string[]>(localStorage.getItem(TAB_STORAGE_KEY), [])
+    const mergedTabs = normalizeTabs([...storedTabs, ...storedList.map((item) => item.tab || DEFAULT_TAB)])
+    const savedTab = normalizeTabName(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || DEFAULT_TAB)
+    const resolvedTab = mergedTabs.includes(savedTab) ? savedTab : mergedTabs[0]
+
+    setMailList(storedList)
+    setTabs(mergedTabs)
+    setActiveTab(resolvedTab)
+    setMoveTargetTab(resolvedTab)
+
+    localStorage.setItem(MAIL_STORAGE_KEY, JSON.stringify(storedList))
+    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(mergedTabs))
   }, [])
 
   useEffect(() => {
     localStorage.setItem(LANG_STORAGE_KEY, lang)
   }, [lang])
+
+  useEffect(() => {
+    localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab)
+  }, [activeTab])
+
+  useEffect(() => {
+    if (!tabs.includes(activeTab)) {
+      setActiveTab(tabs[0] || DEFAULT_TAB)
+    }
+    if (!tabs.includes(moveTargetTab)) {
+      setMoveTargetTab(tabs[0] || DEFAULT_TAB)
+    }
+  }, [tabs, activeTab, moveTargetTab])
+
+  useEffect(() => {
+    const existing = new Set(mailList.map((item) => item.email))
+    setSelectedEmails((prev) => prev.filter((item) => existing.has(item)))
+  }, [mailList])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -282,17 +412,35 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [dialogAccountVisible, dialogCopyVisible, dialogEditVisible, dialogEmailVisible, dialogPostVisible])
 
-  const pageTotal = mailList.length
+  const filteredMailList = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase()
+    return mailList.filter((item) => {
+      const tab = normalizeTabName(item.tab || DEFAULT_TAB)
+      if (tab !== activeTab) return false
+      if (keyword === "") return true
+      return item.email.toLowerCase().includes(keyword) || item.password.toLowerCase().includes(keyword)
+    })
+  }, [mailList, activeTab, searchKeyword])
+
+  const pageTotal = filteredMailList.length
   const pageCount = Math.max(1, Math.ceil(pageTotal / pageSize))
   const clampedPage = Math.min(currentPage, pageCount)
   const tableMailList = useMemo(() => {
     const start = (clampedPage - 1) * pageSize
-    return mailList.slice(start, start + pageSize)
-  }, [mailList, clampedPage, pageSize])
+    return filteredMailList.slice(start, start + pageSize)
+  }, [filteredMailList, clampedPage, pageSize])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeTab, searchKeyword])
 
   function saveMailList(next: Email[]) {
-    setMailList(next)
-    localStorage.setItem("localMailList", JSON.stringify(next))
+    const normalized = normalizeEmailList(next)
+    const mergedTabs = normalizeTabs([...tabs, ...normalized.map((item) => item.tab || DEFAULT_TAB)])
+    setMailList(normalized)
+    setTabs(mergedTabs)
+    localStorage.setItem(MAIL_STORAGE_KEY, JSON.stringify(normalized))
+    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(mergedTabs))
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -312,6 +460,7 @@ function App() {
       password: tempArr[1] || "",
       client_id: tempArr[2] || "",
       refresh_token: tempArr.slice(3).join(splitSymbol) || "",
+      tab: activeTab,
     }
   }
 
@@ -327,13 +476,13 @@ function App() {
       alert(t.selectFileFirst)
       return
     }
-    const next = mailList.concat(parsed)
+    const next = mailList.concat(parsed.map((item) => ({ ...item, tab: activeTab })))
     saveMailList(next)
     setEmailList([])
     setCopyTextarea("")
     setDialogCopyVisible(false)
     setFileName("")
-    alert(t.addSuccess(parsed.length))
+    alert(t.addSuccess(parsed.length, activeTab))
   }
 
   function handleAdd() {
@@ -345,16 +494,102 @@ function App() {
   }
 
   function handleSelectionChange(email: string, checked: boolean) {
-    if (checked) setSelectedEmails((prev) => [...prev, email])
+    if (checked) setSelectedEmails((prev) => (prev.includes(email) ? prev : [...prev, email]))
     else setSelectedEmails((prev) => prev.filter((item) => item !== email))
   }
 
   function handleToggleAll(checked: boolean) {
+    const pageEmails = tableMailList.map((item) => item.email)
     if (checked) {
-      setSelectedEmails(tableMailList.map((item) => item.email))
+      setSelectedEmails((prev) => Array.from(new Set([...prev, ...pageEmails])))
     } else {
-      setSelectedEmails([])
+      setSelectedEmails((prev) => prev.filter((item) => !pageEmails.includes(item)))
     }
+  }
+
+  function handleAddTab() {
+    const rawName = newTabName.trim()
+    if (rawName === "") {
+      alert(t.tabNameRequired)
+      return
+    }
+
+    const exists = tabs.some((item) => item.toLowerCase() === rawName.toLowerCase())
+    if (exists) {
+      alert(t.tabExists)
+      return
+    }
+
+    const nextTab = normalizeTabName(rawName)
+    const nextTabs = normalizeTabs([...tabs, nextTab])
+    setTabs(nextTabs)
+    setActiveTab(nextTab)
+    setMoveTargetTab(nextTab)
+    setNewTabName("")
+    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(nextTabs))
+  }
+
+  function handleRenameActiveTab() {
+    if (activeTab === DEFAULT_TAB) {
+      alert(t.cannotRenameDefaultTab)
+      return
+    }
+
+    const rawName = window.prompt(t.tabRenamePrompt(activeTab), activeTab)
+    if (rawName === null) return
+
+    const nextTab = rawName.trim()
+    if (nextTab === "" || nextTab === activeTab) return
+
+    const exists = tabs.some((item) => item.toLowerCase() === nextTab.toLowerCase() && item !== activeTab)
+    if (exists) {
+      alert(t.tabExists)
+      return
+    }
+
+    const normalizedNextTab = normalizeTabName(nextTab)
+    const updatedRows = mailList.map((item) => (normalizeTabName(item.tab || DEFAULT_TAB) === activeTab
+      ? { ...item, tab: normalizedNextTab }
+      : item))
+    const updatedTabs = tabs.map((item) => (item === activeTab ? normalizedNextTab : item))
+    saveMailList(updatedRows)
+    setTabs(normalizeTabs(updatedTabs))
+    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(normalizeTabs(updatedTabs)))
+    setActiveTab(normalizedNextTab)
+    if (moveTargetTab === activeTab) setMoveTargetTab(normalizedNextTab)
+  }
+
+  function handleDeleteActiveTab() {
+    if (activeTab === DEFAULT_TAB) {
+      alert(t.cannotDeleteDefaultTab)
+      return
+    }
+    if (!window.confirm(t.confirmDeleteTab(activeTab, DEFAULT_TAB))) return
+
+    const updatedRows = mailList.map((item) => (normalizeTabName(item.tab || DEFAULT_TAB) === activeTab
+      ? { ...item, tab: DEFAULT_TAB }
+      : item))
+    const nextTabs = tabs.filter((item) => item !== activeTab)
+    saveMailList(updatedRows)
+    setTabs(normalizeTabs(nextTabs))
+    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(normalizeTabs(nextTabs)))
+    setActiveTab(DEFAULT_TAB)
+    setMoveTargetTab(DEFAULT_TAB)
+    setSelectedEmails([])
+  }
+
+  function handleMoveSelected() {
+    if (selectedEmails.length === 0) {
+      alert(t.selectEmailsToMove)
+      return
+    }
+
+    const targetTab = normalizeTabName(moveTargetTab)
+    const next = mailList.map((item) => (selectedEmails.includes(item.email)
+      ? { ...item, tab: targetTab }
+      : item))
+    saveMailList(next)
+    setSelectedEmails([])
   }
 
   function handleBatchDelete() {
@@ -371,13 +606,19 @@ function App() {
   function handleDeleteAll() {
     if (!window.confirm(t.confirmDeleteAll)) return
     saveMailList([])
+    setTabs([DEFAULT_TAB])
+    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify([DEFAULT_TAB]))
+    setActiveTab(DEFAULT_TAB)
+    setMoveTargetTab(DEFAULT_TAB)
     setSelectedEmails([])
   }
 
   function exportRows(rows: Email[], fileNameValue: string) {
-    const exportContent = rows
-      .map((item) => `${item.email}${splitSymbol}${item.password}${splitSymbol}${item.client_id}${splitSymbol}${item.refresh_token}`)
-      .join("\n")
+    const exportContent = exportMode === "email-only"
+      ? rows.map((item) => item.email).join("\n")
+      : rows
+        .map((item) => `${item.email}${splitSymbol}${item.password}${splitSymbol}${item.client_id}${splitSymbol}${item.refresh_token}`)
+        .join("\n")
     const blob = new Blob([exportContent], { type: "text/plain" })
     const a = document.createElement("a")
     a.href = URL.createObjectURL(blob)
@@ -392,7 +633,10 @@ function App() {
       return
     }
     if (!window.confirm(t.confirmExportSelected)) return
-    exportRows(mailList.filter((item) => selectedEmails.includes(item.email)), "selected_mails.txt")
+    exportRows(
+      mailList.filter((item) => selectedEmails.includes(item.email)),
+      exportMode === "email-only" ? "selected_mail_addresses.txt" : "selected_mails.txt",
+    )
   }
 
   function handleExportAll() {
@@ -401,20 +645,20 @@ function App() {
       return
     }
     if (!window.confirm(t.confirmExportAll)) return
-    exportRows(mailList, "all_mails.txt")
+    exportRows(mailList, exportMode === "email-only" ? "all_mail_addresses.txt" : "all_mails.txt")
   }
 
-  function handleEdit(row: Email, index: number) {
-    const absoluteIndex = (clampedPage - 1) * pageSize + index
-    setEditIndex(absoluteIndex)
+  function handleEdit(row: Email) {
+    setEditEmail(row.email)
     setEditForm({ ...row })
     setDialogEditVisible(true)
   }
 
   function handleSave() {
-    if (editIndex < 0) return
-    const next = [...mailList]
-    next[editIndex] = editForm
+    if (!editEmail) return
+    const next = mailList.map((item) => (item.email === editEmail
+      ? { ...editForm, tab: item.tab }
+      : item))
     saveMailList(next)
     setDialogEditVisible(false)
   }
@@ -423,6 +667,7 @@ function App() {
     if (!window.confirm(t.confirmDeleteEmail(row.email))) return
     const next = mailList.filter((item) => item.email !== row.email)
     saveMailList(next)
+    setSelectedEmails((prev) => prev.filter((item) => item !== row.email))
   }
 
   function handleShowAccount(row: Email) {
@@ -531,8 +776,30 @@ function App() {
   return (
     <div className="home-container">
       <div className="top-nav">
-        <span>{t.home}</span>
-        <span className="active">{t.mailboxManager}</span>
+        <div className="top-nav-main">
+          <span className="active">{t.mailboxManager}</span>
+          <span className="tabs-label">{t.tabs}</span>
+          <div className="tab-list">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                className={`tab-chip ${tab === activeTab ? "active" : ""}`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          <input
+            className="field tab-input"
+            placeholder={t.tabPlaceholder}
+            value={newTabName}
+            onChange={(e) => setNewTabName(e.target.value)}
+          />
+          <button className="btn blue" onClick={handleAddTab}>{t.addTab}</button>
+          <button className="btn dark" onClick={handleRenameActiveTab}>{t.renameTab}</button>
+          <button className="btn orange" onClick={handleDeleteActiveTab}>{t.deleteTab}</button>
+        </div>
         <div className="lang-switch">
           <label htmlFor="lang-select">{t.language}</label>
           <select id="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
@@ -551,10 +818,31 @@ function App() {
         </label>
         <button className="btn green" onClick={handleAdd}>{t.importEmails}</button>
         <button className="btn green" onClick={() => setDialogCopyVisible(true)}>{t.pasteImport}</button>
+        <label>{t.exportMode}</label>
+        <select className="field mini" value={exportMode} onChange={(e) => setExportMode(e.target.value as ExportMode)}>
+          <option value="full">{t.exportFull}</option>
+          <option value="email-only">{t.exportEmailOnly}</option>
+        </select>
         <button className="btn orange" onClick={handleBatchExport}>{t.batchExport}</button>
         <button className="btn orange" onClick={handleExportAll}>{t.exportAll}</button>
         <button className="btn orange" onClick={handleBatchDelete}>{t.batchDelete}</button>
         <button className="btn red" onClick={handleDeleteAll}>{t.deleteAll}</button>
+      </div>
+
+      <div className="toolbar secondary">
+        <input
+          className="field search"
+          placeholder={t.searchByName}
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+        />
+        <label>{t.selectMoveTarget}</label>
+        <select className="field mini" value={moveTargetTab} onChange={(e) => setMoveTargetTab(e.target.value)}>
+          {tabs.map((tab) => (
+            <option key={`move-${tab}`} value={tab}>{tab}</option>
+          ))}
+        </select>
+        <button className="btn dark" onClick={handleMoveSelected}>{t.moveSelected}</button>
       </div>
 
       <div className="table-wrap">
@@ -573,8 +861,8 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {tableMailList.map((row, index) => (
-              <tr key={`${row.email}-${index}`}>
+            {tableMailList.map((row) => (
+              <tr key={`${row.email}-${row.client_id}`}>
                 <td>
                   <input
                     type="checkbox"
@@ -588,7 +876,7 @@ function App() {
                   </button>
                 </td>
                 <td>
-                  <button className="btn-sm blue" onClick={() => handleEdit(row, index)}>{t.edit}</button>
+                  <button className="btn-sm blue" onClick={() => handleEdit(row)}>{t.edit}</button>
                   <button className="btn-sm green" onClick={() => handleInbox(row)}>{t.inbox}</button>
                   <button className="btn-sm green" onClick={() => handleTrash(row)}>{t.junk}</button>
                   <button className="btn-sm red" onClick={() => handleDelete(row)}>{t.delete}</button>

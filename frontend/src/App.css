@@ -6,17 +6,24 @@
 
 .top-nav {
   display: flex;
-  gap: 30px;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
   background: #fff;
   border-bottom: 1px solid #ebeef5;
-  padding: 14px 20px 0;
-  height: 52px;
+  padding: 10px 14px;
 }
 
 .top-nav .active {
   color: #409eff;
-  border-bottom: 2px solid #409eff;
-  padding-bottom: 10px;
+  font-weight: 600;
+}
+
+.top-nav-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .lang-switch {
@@ -24,7 +31,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 10px;
 }
 
 .lang-switch select {
@@ -46,6 +52,37 @@
   flex-wrap: wrap;
 }
 
+.toolbar.secondary {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.tabs-label {
+  color: #606266;
+}
+
+.tab-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tab-chip {
+  border: 1px solid #dcdfe6;
+  background: #fff;
+  color: #606266;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.tab-chip.active {
+  background: #409eff;
+  border-color: #409eff;
+  color: #fff;
+}
+
 .field {
   height: 30px;
   border: 1px solid #dcdfe6;
@@ -56,6 +93,18 @@
 
 .field.api {
   width: 260px;
+}
+
+.field.search {
+  width: 220px;
+}
+
+.field.mini {
+  width: 140px;
+}
+
+.field.tab-input {
+  width: 140px;
 }
 
 .btn {
