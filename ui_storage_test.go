@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
 func TestDefaultStatePathUsesDataFolder(t *testing.T) {
-	want := filepath.Join("Data", "state.json")
-	if got := filepath.Clean(defaultStatePath()); got != filepath.Clean(want) {
+	want := filepath.Clean(filepath.Join("data", "state.json"))
+	if got := filepath.Clean(defaultStatePath()); got != want {
 		t.Fatalf("expected default state path %q, got %q", want, got)
 	}
 }
@@ -183,5 +184,156 @@ func TestLoadUIStateMigratesLegacyJSON(t *testing.T) {
 	}
 	if gotAgain.ActiveTab != "Legacy" {
 		t.Fatalf("expected db source of truth tab Legacy, got %q", gotAgain.ActiveTab)
+	}
+}
+
+func TestLoadUIStateMigratesFromLegacyConfigDBWhenTargetIsSkeleton(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tempWD := t.TempDir()
+	if err := os.Chdir(tempWD); err != nil {
+		t.Fatalf("chdir temp wd: %v", err)
+	}
+	defer func() { _ = os.Chdir(wd) }()
+
+	t.Setenv("APPDATA", filepath.Join(t.TempDir(), "appdata"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "xdg-config"))
+
+	targetDir := t.TempDir()
+	targetDBPath := filepath.Join(targetDir, sqliteDBFileName)
+	targetFilePath := filepath.Join(targetDir, "ui-state.json")
+
+	targetDB, err := openSQLiteStorage(targetDBPath)
+	if err != nil {
+		t.Fatalf("open target db: %v", err)
+	}
+	if err := dbSaveUIState(targetDB, defaultUIState()); err != nil {
+		_ = targetDB.Close()
+		t.Fatalf("save skeleton ui state: %v", err)
+	}
+	_ = targetDB.Close()
+
+	legacyDBPath := legacyAppConfigDBPath()
+	if legacyDBPath == "" {
+		t.Fatalf("legacy app config db path should not be empty")
+	}
+	legacyDB, err := openSQLiteStorage(legacyDBPath)
+	if err != nil {
+		t.Fatalf("open legacy db: %v", err)
+	}
+	legacyState := defaultUIState()
+	legacyState.ActiveTab = "Legacy"
+	legacyState.Tabs = []string{"Default", "Legacy"}
+	legacyState.MailList = []UIMailItem{
+		{
+			Email:        "seed@example.test",
+			Password:     "seed-user",
+			ClientID:     "seed-client",
+			RefreshToken: "seed-token",
+			Tab:          "Legacy",
+			Remark:       "seed",
+			Tags:         []string{"seed"},
+		},
+	}
+	if err := dbSaveUIState(legacyDB, legacyState); err != nil {
+		_ = legacyDB.Close()
+		t.Fatalf("save legacy ui state: %v", err)
+	}
+	_ = legacyDB.Close()
+
+	got, err := loadUIState(targetFilePath)
+	if err != nil {
+		t.Fatalf("load ui state: %v", err)
+	}
+	if len(got.MailList) != 1 || got.MailList[0].Email != "seed@example.test" {
+		t.Fatalf("expected migration from legacy config db, got %#v", got.MailList)
+	}
+}
+
+func TestConcurrentSaveAndLoadUIStateDoesNotFail(t *testing.T) {
+	filePath := filepath.Join(t.TempDir(), "ui-state.json")
+	base := defaultUIState()
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 256)
+
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			for n := 0; n < 40; n++ {
+				state := base
+				state.ActiveTab = "Default"
+				state.MailList = []UIMailItem{
+					{
+						Email:        "user@example.test",
+						Password:     "user",
+						ClientID:     "client",
+						RefreshToken: "token",
+						Tab:          "Default",
+						Remark:       "w",
+						Tags:         []string{"x"},
+					},
+				}
+				if err := saveUIState(filePath, state); err != nil {
+					errCh <- err
+					return
+				}
+				if _, err := loadUIState(filePath); err != nil {
+					errCh <- err
+					return
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Fatalf("concurrent save/load failed: %v", err)
+	}
+}
+
+func TestSaveUIStateHandlesDuplicateEmailRows(t *testing.T) {
+	filePath := filepath.Join(t.TempDir(), "ui-state.json")
+
+	state := defaultUIState()
+	state.MailList = []UIMailItem{
+		{
+			Email:        "dup@example.test",
+			Password:     "user1",
+			ClientID:     "client1",
+			RefreshToken: "token1",
+			Tab:          "Default",
+			Remark:       "first",
+			Tags:         []string{"a"},
+		},
+		{
+			Email:        "dup@example.test",
+			Password:     "user2",
+			ClientID:     "client2",
+			RefreshToken: "token2",
+			Tab:          "VIP",
+			Remark:       "second",
+			Tags:         []string{"b"},
+		},
+	}
+
+	if err := saveUIState(filePath, state); err != nil {
+		t.Fatalf("saveUIState should not fail for duplicate emails, got: %v", err)
+	}
+
+	got, err := loadUIState(filePath)
+	if err != nil {
+		t.Fatalf("loadUIState returned unexpected error: %v", err)
+	}
+	if len(got.MailList) != 1 {
+		t.Fatalf("expected deduped mail list size 1, got %d", len(got.MailList))
+	}
+	if got.MailList[0].Email != "dup@example.test" {
+		t.Fatalf("expected retained email dup@example.test, got %q", got.MailList[0].Email)
 	}
 }

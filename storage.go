@@ -7,6 +7,9 @@ import (
 const defaultAPIBaseURL = "http://127.0.0.1:3000"
 
 func loadState(filePath string) (AppState, error) {
+	sqliteStorageMu.Lock()
+	defer sqliteStorageMu.Unlock()
+
 	db, err := openSQLiteStorage(sqlitePathFromLegacyPath(filePath))
 	if err != nil {
 		return AppState{}, err
@@ -21,6 +24,9 @@ func loadState(filePath string) (AppState, error) {
 }
 
 func saveState(filePath string, state AppState) error {
+	sqliteStorageMu.Lock()
+	defer sqliteStorageMu.Unlock()
+
 	db, err := openSQLiteStorage(sqlitePathFromLegacyPath(filePath))
 	if err != nil {
 		return err

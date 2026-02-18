@@ -21,6 +21,9 @@ var allowedPageSizes = map[int]struct{}{
 }
 
 func loadUIState(filePath string) (UIState, error) {
+	sqliteStorageMu.Lock()
+	defer sqliteStorageMu.Unlock()
+
 	db, err := openSQLiteStorage(sqlitePathFromLegacyPath(filePath))
 	if err != nil {
 		return UIState{}, err
@@ -35,6 +38,9 @@ func loadUIState(filePath string) (UIState, error) {
 }
 
 func saveUIState(filePath string, state UIState) error {
+	sqliteStorageMu.Lock()
+	defer sqliteStorageMu.Unlock()
+
 	db, err := openSQLiteStorage(sqlitePathFromLegacyPath(filePath))
 	if err != nil {
 		return err
@@ -170,7 +176,7 @@ func normalizeUITabName(value string) string {
 }
 
 func dataDirPath() string {
-	return filepath.Join(".", "Data")
+	return filepath.Join(".", "data")
 }
 
 func defaultUIStatePath() string {

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -18,6 +20,44 @@ const sqliteDBFileName = "app.db"
 type mailTagPair struct {
 	Email string
 	Tag   string
+}
+
+var sqliteStorageMu sync.Mutex
+
+func legacyWorkingDirDataDirPath() string {
+	return filepath.Join(".", "Data")
+}
+
+func legacyWorkingDirDBPath() string {
+	return filepath.Join(legacyWorkingDirDataDirPath(), sqliteDBFileName)
+}
+
+func legacyWorkingDirStatePath() string {
+	return filepath.Join(legacyWorkingDirDataDirPath(), "state.json")
+}
+
+func legacyWorkingDirUIStatePath() string {
+	return filepath.Join(legacyWorkingDirDataDirPath(), "ui-state.json")
+}
+
+func legacyAppConfigDataDirPath() string {
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return ""
+	}
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return ""
+	}
+	return filepath.Join(base, "MS-Mail-Manager", "Data")
+}
+
+func legacyAppConfigDBPath() string {
+	dir := legacyAppConfigDataDirPath()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, sqliteDBFileName)
 }
 
 func sqlitePathFromLegacyPath(filePath string) string {
@@ -49,26 +89,35 @@ func openSQLiteStorage(dbPath string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, err
-	}
-	db.SetMaxOpenConns(1)
+	var lastErr error
+	for i := 0; i < 8; i++ {
+		db, err := sql.Open("sqlite", dbPath)
+		if err != nil {
+			lastErr = err
+			time.Sleep(80 * time.Millisecond)
+			continue
+		}
+		db.SetMaxOpenConns(1)
 
-	if err := initSQLiteSchema(db); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
+		if err := initSQLiteSchema(db); err != nil {
+			_ = db.Close()
+			lastErr = err
+			if strings.Contains(strings.ToLower(err.Error()), "database is locked") {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			return nil, err
+		}
 
-	return db, nil
+		return db, nil
+	}
+	return nil, lastErr
 }
 
 func initSQLiteSchema(db *sql.DB) error {
 	statements := []string{
-		`PRAGMA journal_mode=WAL;`,
-		`PRAGMA synchronous=NORMAL;`,
-		`PRAGMA foreign_keys=ON;`,
 		`PRAGMA busy_timeout=5000;`,
+		`PRAGMA foreign_keys=ON;`,
 		`CREATE TABLE IF NOT EXISTS app_settings (
 			key TEXT PRIMARY KEY,
 			value TEXT NOT NULL
@@ -112,6 +161,10 @@ func initSQLiteSchema(db *sql.DB) error {
 			cache_key TEXT PRIMARY KEY,
 			posts_json TEXT NOT NULL DEFAULT '[]'
 		);`,
+		`CREATE TABLE IF NOT EXISTS storage_meta (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL
+		);`,
 		`CREATE INDEX IF NOT EXISTS idx_accounts_email ON accounts(email);`,
 		`CREATE INDEX IF NOT EXISTS idx_ui_mails_tab ON ui_mails(tab);`,
 		`CREATE INDEX IF NOT EXISTS idx_ui_mail_tags_tag ON ui_mail_tags(tag);`,
@@ -136,28 +189,64 @@ func dbTableHasRows(db *sql.DB, tableName string) (bool, error) {
 }
 
 func dbHasAppData(db *sql.DB) (bool, error) {
-	settings, err := dbTableHasRows(db, "app_settings")
+	state, err := dbLoadAppState(db)
 	if err != nil {
 		return false, err
 	}
-	if settings {
+	if len(state.Accounts) > 0 {
 		return true, nil
 	}
-	return dbTableHasRows(db, "accounts")
+	return strings.TrimSpace(state.APIBaseURL) != defaultAPIBaseURL, nil
 }
 
 func dbHasUIData(db *sql.DB) (bool, error) {
-	tables := []string{"ui_settings", "ui_tabs", "ui_mails", "ui_mail_cache", "ui_tags", "ui_mail_tags"}
-	for _, table := range tables {
-		hasRows, err := dbTableHasRows(db, table)
-		if err != nil {
-			return false, err
-		}
-		if hasRows {
-			return true, nil
-		}
+	state, err := dbLoadUIState(db)
+	if err != nil {
+		return false, err
+	}
+
+	if len(state.MailList) > 0 {
+		return true, nil
+	}
+	if len(state.MailCache) > 0 {
+		return true, nil
+	}
+	if len(state.Tabs) > 1 {
+		return true, nil
+	}
+	if !strings.EqualFold(state.ActiveTab, defaultTab) {
+		return true, nil
+	}
+	if state.Lang != defaultLang {
+		return true, nil
+	}
+	if state.SplitSymbol != defaultSplitSymbol {
+		return true, nil
+	}
+	if state.PageSize != defaultPageSize {
+		return true, nil
 	}
 	return false, nil
+}
+
+func getMeta(db *sql.DB, key string) (string, bool, error) {
+	var value string
+	err := db.QueryRow(`SELECT value FROM storage_meta WHERE key = ?`, key).Scan(&value)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return value, true, nil
+}
+
+func setMeta(db *sql.DB, key string, value string) error {
+	_, err := db.Exec(`
+		INSERT INTO storage_meta(key, value) VALUES(?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value
+	`, key, value)
+	return err
 }
 
 func readLegacyAppStateFile(filePath string) (AppState, bool, error) {
@@ -193,12 +282,21 @@ func readLegacyUIStateFile(filePath string) (UIState, bool, error) {
 }
 
 func migrateLegacyAppState(db *sql.DB, filePath string) error {
+	const metaKey = "app_legacy_migration_checked"
+	_, checked, err := getMeta(db, metaKey)
+	if err != nil {
+		return err
+	}
+	if checked {
+		return nil
+	}
+
 	hasData, err := dbHasAppData(db)
 	if err != nil {
 		return err
 	}
 	if hasData {
-		return nil
+		return setMeta(db, metaKey, "1")
 	}
 
 	state, found, err := readLegacyAppStateFile(filePath)
@@ -206,19 +304,40 @@ func migrateLegacyAppState(db *sql.DB, filePath string) error {
 		return err
 	}
 	if !found {
-		return nil
+		if err := migrateAppFromLegacyWorkingDirDB(db, filePath); err != nil {
+			return err
+		}
+		state, found, err = readLegacyAppStateFile(legacyWorkingDirStatePath())
+		if err != nil {
+			return err
+		}
+		if !found {
+			return setMeta(db, metaKey, "1")
+		}
 	}
 
-	return dbSaveAppState(db, state)
+	if err := dbSaveAppState(db, state); err != nil {
+		return err
+	}
+	return setMeta(db, metaKey, "1")
 }
 
 func migrateLegacyUIState(db *sql.DB, filePath string) error {
+	const metaKey = "ui_legacy_migration_checked"
+	_, checked, err := getMeta(db, metaKey)
+	if err != nil {
+		return err
+	}
+	if checked {
+		return nil
+	}
+
 	hasData, err := dbHasUIData(db)
 	if err != nil {
 		return err
 	}
 	if hasData {
-		return nil
+		return setMeta(db, metaKey, "1")
 	}
 
 	state, found, err := readLegacyUIStateFile(filePath)
@@ -226,10 +345,108 @@ func migrateLegacyUIState(db *sql.DB, filePath string) error {
 		return err
 	}
 	if !found {
-		return nil
+		if err := migrateUIFromLegacyWorkingDirDB(db, filePath); err != nil {
+			return err
+		}
+		state, found, err = readLegacyUIStateFile(legacyWorkingDirUIStatePath())
+		if err != nil {
+			return err
+		}
+		if !found {
+			return setMeta(db, metaKey, "1")
+		}
 	}
 
-	return dbSaveUIState(db, state)
+	if err := dbSaveUIState(db, state); err != nil {
+		return err
+	}
+	return setMeta(db, metaKey, "1")
+}
+
+func migrateAppFromLegacyWorkingDirDB(db *sql.DB, filePath string) error {
+	targetDBPath := filepath.Clean(sqlitePathFromLegacyPath(filePath))
+	candidates := []string{
+		legacyWorkingDirDBPath(),
+		legacyAppConfigDBPath(),
+	}
+
+	for _, candidate := range candidates {
+		if strings.TrimSpace(candidate) == "" {
+			continue
+		}
+		legacyDBPath := filepath.Clean(candidate)
+		if legacyDBPath == targetDBPath {
+			continue
+		}
+
+		if _, err := os.Stat(legacyDBPath); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return err
+		}
+
+		legacyDB, err := openSQLiteStorage(legacyDBPath)
+		if err != nil {
+			return err
+		}
+
+		legacyState, err := dbLoadAppState(legacyDB)
+		_ = legacyDB.Close()
+		if err != nil {
+			return err
+		}
+		if len(legacyState.Accounts) == 0 && strings.TrimSpace(legacyState.APIBaseURL) == defaultAPIBaseURL {
+			continue
+		}
+
+		return dbSaveAppState(db, legacyState)
+	}
+
+	return nil
+}
+
+func migrateUIFromLegacyWorkingDirDB(db *sql.DB, filePath string) error {
+	targetDBPath := filepath.Clean(sqlitePathFromLegacyPath(filePath))
+	candidates := []string{
+		legacyWorkingDirDBPath(),
+		legacyAppConfigDBPath(),
+	}
+
+	for _, candidate := range candidates {
+		if strings.TrimSpace(candidate) == "" {
+			continue
+		}
+		legacyDBPath := filepath.Clean(candidate)
+		if legacyDBPath == targetDBPath {
+			continue
+		}
+
+		if _, err := os.Stat(legacyDBPath); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return err
+		}
+
+		legacyDB, err := openSQLiteStorage(legacyDBPath)
+		if err != nil {
+			return err
+		}
+
+		legacyState, err := dbLoadUIState(legacyDB)
+		_ = legacyDB.Close()
+		if err != nil {
+			return err
+		}
+		if len(legacyState.MailList) == 0 && len(legacyState.MailCache) == 0 && len(legacyState.Tabs) <= 1 {
+			continue
+		}
+
+		return dbSaveUIState(db, legacyState)
+	}
+
+	return nil
 }
 
 func dbLoadAppState(db *sql.DB) (AppState, error) {
@@ -504,6 +721,12 @@ func dbSaveUIState(db *sql.DB, state UIState) error {
 		if _, err := tx.Exec(`
 			INSERT INTO ui_mails(email, password, client_id, refresh_token, tab, remark)
 			VALUES(?, ?, ?, ?, ?, ?)
+			ON CONFLICT(email) DO UPDATE SET
+				password = excluded.password,
+				client_id = excluded.client_id,
+				refresh_token = excluded.refresh_token,
+				tab = excluded.tab,
+				remark = excluded.remark
 		`, row.Email, row.Password, row.ClientID, row.RefreshToken, row.Tab, row.Remark); err != nil {
 			return err
 		}
@@ -514,12 +737,12 @@ func dbSaveUIState(db *sql.DB, state UIState) error {
 		}
 	}
 	for tag := range tagSet {
-		if _, err := tx.Exec(`INSERT INTO ui_tags(name) VALUES(?)`, tag); err != nil {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO ui_tags(name) VALUES(?)`, tag); err != nil {
 			return err
 		}
 	}
 	for _, pair := range tagLinks {
-		if _, err := tx.Exec(`INSERT INTO ui_mail_tags(email, tag) VALUES(?, ?)`, pair.Email, pair.Tag); err != nil {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO ui_mail_tags(email, tag) VALUES(?, ?)`, pair.Email, pair.Tag); err != nil {
 			return err
 		}
 	}

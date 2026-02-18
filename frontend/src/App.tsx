@@ -105,7 +105,6 @@ function App() {
   const t = translations[lang]
   const [splitSymbol, setSplitSymbol] = useState(DEFAULT_SPLIT_SYMBOL)
   const [fileName, setFileName] = useState("")
-  const [emailList, setEmailList] = useState<string[]>([])
   const [tabs, setTabs] = useState<string[]>([DEFAULT_TAB])
   const [activeTab, setActiveTab] = useState(DEFAULT_TAB)
   const [newTabName, setNewTabName] = useState("")
@@ -169,14 +168,12 @@ function App() {
         setMoveTargetTab(resolvedTab)
         setPageSize(normalizePageSize(stored?.pageSize || DEFAULT_PAGE_SIZE))
         setMailCache((stored?.mailCache || {}) as Record<string, Post[]>)
+        setStateLoaded(true)
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setStateLoaded(true)
-        }
+        const message = error instanceof Error ? error.message : String(error)
+        alert(`Local data load failed: ${message}`)
       })
 
     return () => {
@@ -441,7 +438,7 @@ function App() {
     if (!file) return
     setFileName(file.name.length > 10 ? `${file.name.slice(0, 10)}...` : file.name)
     file.text().then((content) => {
-      setEmailList(content.split("\n"))
+      importParsedRows(parseImportedLines(content.split("\n")))
     })
     event.target.value = ""
   }
@@ -473,15 +470,10 @@ function App() {
     }
     const next = mailList.concat(parsed.map((item) => ({ ...item, tab: activeTab })))
     saveMailList(next)
-    setEmailList([])
     setCopyTextarea("")
     setDialogCopyVisible(false)
     setFileName("")
     alert(t.addSuccess(parsed.length, activeTab))
-  }
-
-  function handleAdd() {
-    importParsedRows(parseImportedLines(emailList))
   }
 
   function handlePasteAdd() {
@@ -1044,7 +1036,6 @@ function App() {
           {fileName || t.chooseFile}
           <input type="file" accept=".txt,.csv" hidden onChange={handleFileChange} />
         </label>
-        <button className="btn green" onClick={handleAdd}>{t.importEmails}</button>
         <button className="btn green" onClick={() => setDialogCopyVisible(true)}>{t.pasteImport}</button>
         <label>{t.exportMode}</label>
         <select className="field mini" value={exportMode} onChange={(e) => setExportMode(e.target.value as ExportMode)}>
