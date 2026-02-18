@@ -1,14 +1,21 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react"
 import "./App.css"
+import { GetUIState, MailAll, ProcessMailbox, SaveUIState } from "../wailsjs/go/main/App"
+import { Lang, translations } from "./i18n/translations"
+const DEFAULT_TAB = "Default"
+const DEFAULT_SPLIT_SYMBOL = "----"
+const DEFAULT_PAGE_SIZE = 5
 
+type ExportMode = "full" | "email-only"
 type Email = {
   email: string
   password: string
   client_id: string
   refresh_token: string
-  tab?: string
+  tab: string
+  remark: string
+  tags: string[]
 }
-
 type Post = {
   send: string
   subject: string
@@ -16,264 +23,52 @@ type Post = {
   html: string
   date: string
 }
-
-type Lang = "en" | "zh"
-
-type Translations = {
-  home: string
-  mailboxManager: string
-  language: string
-  english: string
-  chinese: string
-  tabs: string
-  tabPlaceholder: string
-  addTab: string
-  renameTab: string
-  deleteTab: string
-  selectMoveTarget: string
-  moveSelected: string
-  searchByName: string
-  separator: string
-  chooseFile: string
-  importEmails: string
-  pasteImport: string
-  batchExport: string
-  exportAll: string
-  batchDelete: string
-  deleteAll: string
-  exportMode: string
-  exportFull: string
-  exportEmailOnly: string
-  selectFileFirst: string
-  addSuccess: (count: number, tab: string) => string
-  selectEmailsToDelete: string
-  confirmDeleteSelected: string
-  confirmDeleteAll: string
-  selectEmailsToExport: string
-  confirmExportSelected: string
-  addEmailFirst: string
-  confirmExportAll: string
-  selectEmailsToMove: string
-  tabNameRequired: string
-  tabExists: string
-  cannotDeleteDefaultTab: string
-  cannotRenameDefaultTab: string
-  tabRenamePrompt: (current: string) => string
-  confirmDeleteTab: (tab: string, moveTo: string) => string
-  confirmDeleteEmail: (email: string) => string
-  fetchTimeout: string
-  fetchFailed: string
-  inboxTitle: (email: string) => string
-  junkTitle: (email: string) => string
-  clearMailboxConfirm: (email: string) => string
-  email: string
-  actions: string
-  edit: string
-  inbox: string
-  junk: string
-  delete: string
-  total: string
-  prev: string
-  next: string
-  pasteImportTitle: string
-  cancel: string
-  import: string
-  editTitle: string
-  save: string
-  password: string
-  clientId: string
-  refreshToken: string
-  receiving: string
-  fetchNewMail: string
-  cancelReceive: string
-  clear: string
-  sender: string
-  subject: string
-  text: string
-  date: string
-  view: string
-  mailContent: string
-  accountDetail: string
-  username: string
-}
-
-const translations: Record<Lang, Translations> = {
-  en: {
-    home: "Home",
-    mailboxManager: "Mailbox Manager",
-    language: "Language",
-    english: "English",
-    chinese: "Chinese",
-    tabs: "Tabs",
-    tabPlaceholder: "New tab name",
-    addTab: "Add Tab",
-    renameTab: "Rename Tab",
-    deleteTab: "Delete Tab",
-    selectMoveTarget: "Move to tab",
-    moveSelected: "Move Selected",
-    searchByName: "Search by name/email",
-    separator: "Separator:",
-    chooseFile: "Choose File",
-    importEmails: "Import Emails",
-    pasteImport: "Paste Import",
-    batchExport: "Batch Export",
-    exportAll: "Export All",
-    batchDelete: "Batch Delete",
-    deleteAll: "Delete All",
-    exportMode: "Export",
-    exportFull: "Full rows",
-    exportEmailOnly: "Email only",
-    selectFileFirst: "Please choose a file first",
-    addSuccess: (count, tab) => `Mailbox addresses added: ${count} (Tab: ${tab})`,
-    selectEmailsToDelete: "Please select emails to delete",
-    confirmDeleteSelected: "Delete selected mailboxes?",
-    confirmDeleteAll: "Delete all mailboxes?",
-    selectEmailsToExport: "Please select emails to export",
-    confirmExportSelected: "Export selected mailboxes?",
-    addEmailFirst: "Please add mailboxes first",
-    confirmExportAll: "Export all mailboxes?",
-    selectEmailsToMove: "Please select emails to move",
-    tabNameRequired: "Tab name is required",
-    tabExists: "Tab already exists",
-    cannotDeleteDefaultTab: "Default tab cannot be deleted",
-    cannotRenameDefaultTab: "Default tab cannot be renamed",
-    tabRenamePrompt: (current) => `Rename tab "${current}" to:`,
-    confirmDeleteTab: (tab, moveTo) => `Delete tab "${tab}"? Its mails will move to "${moveTo}".`,
-    confirmDeleteEmail: (email) => `Delete mailbox ${email}?`,
-    fetchTimeout: "Receive timeout",
-    fetchFailed: "Receive failed",
-    inboxTitle: (email) => `${email} Inbox`,
-    junkTitle: (email) => `${email} Junk`,
-    clearMailboxConfirm: (email) => `Clear all emails in ${email}?`,
-    email: "Email",
-    actions: "Actions",
-    edit: "Edit",
-    inbox: "Inbox",
-    junk: "Junk",
-    delete: "Delete",
-    total: "total",
-    prev: "prev",
-    next: "next",
-    pasteImportTitle: "Paste Import",
-    cancel: "Cancel",
-    import: "Import",
-    editTitle: "Edit",
-    save: "Save",
-    password: "Password",
-    clientId: "Client ID",
-    refreshToken: "Refresh Token",
-    receiving: "Receiving...",
-    fetchNewMail: "Fetch New Mail",
-    cancelReceive: "Cancel",
-    clear: "Clear",
-    sender: "Sender",
-    subject: "Subject",
-    text: "Text",
-    date: "Date",
-    view: "View",
-    mailContent: "Mail Content",
-    accountDetail: "Account Details",
-    username: "Username",
-  },
-  zh: {
-    home: "首页",
-    mailboxManager: "邮箱管理",
-    language: "语言",
-    english: "英文",
-    chinese: "中文",
-    tabs: "分组",
-    tabPlaceholder: "新分组名称",
-    addTab: "新增分组",
-    renameTab: "重命名分组",
-    deleteTab: "删除分组",
-    selectMoveTarget: "移动到分组",
-    moveSelected: "移动选中",
-    searchByName: "按用户名/邮箱搜索",
-    separator: "分隔符：",
-    chooseFile: "选择文件",
-    importEmails: "导入邮箱",
-    pasteImport: "粘贴导入",
-    batchExport: "批量导出",
-    exportAll: "全部导出",
-    batchDelete: "批量删除",
-    deleteAll: "全部删除",
-    exportMode: "导出格式",
-    exportFull: "完整行",
-    exportEmailOnly: "仅邮箱",
-    selectFileFirst: "请先选择文件解析",
-    addSuccess: (count, tab) => `邮箱地址添加成功 共${count}条 (分组: ${tab})`,
-    selectEmailsToDelete: "请选择要删除的邮箱",
-    confirmDeleteSelected: "确认删除选中的邮箱吗？",
-    confirmDeleteAll: "确认删除所有邮箱吗？",
-    selectEmailsToExport: "请选择要导出的邮箱",
-    confirmExportSelected: "确认导出选中的邮箱吗？",
-    addEmailFirst: "请先添加邮箱",
-    confirmExportAll: "确认导出所有邮箱吗？",
-    selectEmailsToMove: "请选择要移动的邮箱",
-    tabNameRequired: "分组名称不能为空",
-    tabExists: "分组已存在",
-    cannotDeleteDefaultTab: "默认分组不能删除",
-    cannotRenameDefaultTab: "默认分组不能重命名",
-    tabRenamePrompt: (current) => `把分组 "${current}" 重命名为：`,
-    confirmDeleteTab: (tab, moveTo) => `确认删除分组 "${tab}" 吗？分组内邮箱将移动到 "${moveTo}"。`,
-    confirmDeleteEmail: (email) => `确认删除邮箱 ${email} 吗？`,
-    fetchTimeout: "收取超时",
-    fetchFailed: "收取失败",
-    inboxTitle: (email) => `${email}的收件箱`,
-    junkTitle: (email) => `${email}的垃圾箱`,
-    clearMailboxConfirm: (email) => `确认清空邮箱 ${email} 的所有邮件吗？`,
-    email: "邮箱",
-    actions: "操作",
-    edit: "编辑",
-    inbox: "收件箱",
-    junk: "垃圾箱",
-    delete: "删除",
-    total: "total",
-    prev: "prev",
-    next: "next",
-    pasteImportTitle: "粘贴导入",
-    cancel: "取消",
-    import: "导入",
-    editTitle: "编辑",
-    save: "保存",
-    password: "密码",
-    clientId: "客户端ID",
-    refreshToken: "刷新令牌",
-    receiving: "收取中...",
-    fetchNewMail: "收取新邮件",
-    cancelReceive: "取消收取",
-    clear: "清空",
-    sender: "发件人",
-    subject: "主题",
-    text: "文本",
-    date: "日期",
-    view: "查看",
-    mailContent: "邮件内容",
-    accountDetail: "账号详情",
-    username: "用户名",
-  },
-}
-
-const LANG_STORAGE_KEY = "uiLang"
-const MAIL_STORAGE_KEY = "localMailList"
-const TAB_STORAGE_KEY = "localMailTabs"
-const ACTIVE_TAB_STORAGE_KEY = "activeMailTab"
-const DEFAULT_TAB = "Default"
-
-type ExportMode = "full" | "email-only"
-
-function safeParseJSON<T>(value: string | null, fallback: T): T {
-  if (!value) return fallback
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return fallback
-  }
+type TagContextMenuState = {
+  x: number
+  y: number
+  rowEmail: string | null
+  tag: string
+  source: "filter" | "row"
 }
 
 function normalizeTabName(value: string): string {
   const next = value.trim()
   return next === "" ? DEFAULT_TAB : next
+}
+
+function normalizeLang(value: string): Lang {
+  const next = value.trim().toLowerCase()
+  if (next === "cht" || next === "zh") return "cht"
+  if (next === "eng" || next === "en") return "eng"
+  return "eng"
+}
+
+function normalizePageSize(value: number): number {
+  return [5, 10, 20, 50, 100].includes(value) ? value : DEFAULT_PAGE_SIZE
+}
+
+function normalizeTag(value: string): string {
+  return value.trim()
+}
+
+function normalizeTags(tags: string[]): string[] {
+  const seen = new Set<string>()
+  const output: string[] = []
+  for (const raw of tags) {
+    const next = normalizeTag(raw)
+    if (next === "" || seen.has(next)) continue
+    seen.add(next)
+    output.push(next)
+  }
+  return output
+}
+
+function parseTagsInput(value: string): string[] {
+  return normalizeTags(value.split(","))
+}
+
+function tagsToText(tags: string[]): string {
+  return normalizeTags(tags).join(", ")
 }
 
 function normalizeEmail(row: Email): Email {
@@ -283,6 +78,8 @@ function normalizeEmail(row: Email): Email {
     client_id: (row.client_id || "").trim(),
     refresh_token: (row.refresh_token || "").trim(),
     tab: normalizeTabName(row.tab || DEFAULT_TAB),
+    remark: (row.remark || "").trim(),
+    tags: normalizeTags(row.tags || []),
   }
 }
 
@@ -304,25 +101,28 @@ function normalizeTabs(input: string[]): string[] {
 }
 
 function App() {
-  const apiBaseURL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "")
-  const [lang, setLang] = useState<Lang>(() => {
-    const saved = localStorage.getItem(LANG_STORAGE_KEY)
-    return saved === "zh" ? "zh" : "en"
-  })
+  const [lang, setLang] = useState<Lang>("eng")
   const t = translations[lang]
-  const [splitSymbol, setSplitSymbol] = useState("----")
+  const [splitSymbol, setSplitSymbol] = useState(DEFAULT_SPLIT_SYMBOL)
   const [fileName, setFileName] = useState("")
   const [emailList, setEmailList] = useState<string[]>([])
   const [tabs, setTabs] = useState<string[]>([DEFAULT_TAB])
   const [activeTab, setActiveTab] = useState(DEFAULT_TAB)
   const [newTabName, setNewTabName] = useState("")
   const [moveTargetTab, setMoveTargetTab] = useState(DEFAULT_TAB)
+  const [selectByTags, setSelectByTags] = useState<string[]>([])
   const [searchKeyword, setSearchKeyword] = useState("")
   const [exportMode, setExportMode] = useState<ExportMode>("full")
   const [mailList, setMailList] = useState<Email[]>([])
   const [selectedEmails, setSelectedEmails] = useState<string[]>([])
   const [dialogCopyVisible, setDialogCopyVisible] = useState(false)
+  const [tagContextMenu, setTagContextMenu] = useState<TagContextMenuState | null>(null)
+  const [dialogTagVisible, setDialogTagVisible] = useState(false)
   const [copyTextarea, setCopyTextarea] = useState("")
+  const [tagDialogMode, setTagDialogMode] = useState<"add" | "remove">("add")
+  const [tagDialogRow, setTagDialogRow] = useState<Email | null>(null)
+  const [tagDialogExisting, setTagDialogExisting] = useState<string[]>([])
+  const [tagDialogNew, setTagDialogNew] = useState("")
   const [dialogEditVisible, setDialogEditVisible] = useState(false)
   const [dialogEmailVisible, setDialogEmailVisible] = useState(false)
   const [dialogPostVisible, setDialogPostVisible] = useState(false)
@@ -332,10 +132,12 @@ function App() {
   const [boxType, setBoxType] = useState("INBOX")
   const [postLoading, setPostLoading] = useState(false)
   const [postList, setPostList] = useState<Post[]>([])
+  const [mailCache, setMailCache] = useState<Record<string, Post[]>>({})
   const [nowPost, setNowPost] = useState<Email | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const receiveRequestRef = useRef(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(5)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [stateLoaded, setStateLoaded] = useState(false)
   const [editEmail, setEditEmail] = useState("")
   const [editForm, setEditForm] = useState<Email>({
     email: "",
@@ -343,31 +145,59 @@ function App() {
     client_id: "",
     refresh_token: "",
     tab: DEFAULT_TAB,
+    remark: "",
+    tags: [],
   })
 
   useEffect(() => {
-    const storedList = normalizeEmailList(safeParseJSON<Email[]>(localStorage.getItem(MAIL_STORAGE_KEY), []))
-    const storedTabs = safeParseJSON<string[]>(localStorage.getItem(TAB_STORAGE_KEY), [])
-    const mergedTabs = normalizeTabs([...storedTabs, ...storedList.map((item) => item.tab || DEFAULT_TAB)])
-    const savedTab = normalizeTabName(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || DEFAULT_TAB)
-    const resolvedTab = mergedTabs.includes(savedTab) ? savedTab : mergedTabs[0]
+    let cancelled = false
+    void GetUIState()
+      .then((stored) => {
+        if (cancelled) return
 
-    setMailList(storedList)
-    setTabs(mergedTabs)
-    setActiveTab(resolvedTab)
-    setMoveTargetTab(resolvedTab)
+        const loadedList = normalizeEmailList((stored?.mailList || []) as Email[])
+        const loadedTabs = normalizeTabs((stored?.tabs || []) as string[])
+        const mergedTabs = normalizeTabs([...loadedTabs, ...loadedList.map((item) => item.tab || DEFAULT_TAB)])
+        const savedTab = normalizeTabName(stored?.activeTab || DEFAULT_TAB)
+        const resolvedTab = mergedTabs.includes(savedTab) ? savedTab : mergedTabs[0]
 
-    localStorage.setItem(MAIL_STORAGE_KEY, JSON.stringify(storedList))
-    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(mergedTabs))
+        setLang(normalizeLang(stored?.lang || "eng"))
+        setSplitSymbol((stored?.splitSymbol || DEFAULT_SPLIT_SYMBOL).trim() || DEFAULT_SPLIT_SYMBOL)
+        setMailList(loadedList)
+        setTabs(mergedTabs)
+        setActiveTab(resolvedTab)
+        setMoveTargetTab(resolvedTab)
+        setPageSize(normalizePageSize(stored?.pageSize || DEFAULT_PAGE_SIZE))
+        setMailCache((stored?.mailCache || {}) as Record<string, Post[]>)
+      })
+      .catch(() => {
+        if (cancelled) return
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setStateLoaded(true)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
-    localStorage.setItem(LANG_STORAGE_KEY, lang)
-  }, [lang])
-
-  useEffect(() => {
-    localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab)
-  }, [activeTab])
+    if (!stateLoaded) return
+    void SaveUIState({
+      lang,
+      splitSymbol,
+      tabs,
+      activeTab,
+      pageSize: normalizePageSize(pageSize),
+      mailList: normalizeEmailList(mailList),
+      mailCache,
+    } as any).catch(() => {
+      // Ignore persistence failures in UI loop; user actions should remain responsive.
+    })
+  }, [stateLoaded, lang, splitSymbol, tabs, activeTab, pageSize, mailList, mailCache])
 
   useEffect(() => {
     if (!tabs.includes(activeTab)) {
@@ -385,6 +215,29 @@ function App() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && tagContextMenu) {
+        setTagContextMenu(null)
+        return
+      }
+      if (dialogTagVisible) {
+        if (event.key === "Escape") {
+          closeTagDialog()
+          return
+        }
+        if (event.key === "Enter") {
+          event.preventDefault()
+          handleApplyTagDialog()
+          return
+        }
+        if (event.key === "Delete" && tagDialogMode === "remove") {
+          const hasTargets = tagDialogExisting.length > 0 || parseTagsInput(tagDialogNew).length > 0
+          if (hasTargets) {
+            event.preventDefault()
+            handleApplyTagDialog()
+          }
+          return
+        }
+      }
       if (event.key !== "Escape") return
       if (dialogPostVisible) {
         setDialogPostVisible(false)
@@ -410,17 +263,35 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [dialogAccountVisible, dialogCopyVisible, dialogEditVisible, dialogEmailVisible, dialogPostVisible])
+  }, [
+    dialogAccountVisible,
+    dialogCopyVisible,
+    dialogEditVisible,
+    dialogEmailVisible,
+    dialogPostVisible,
+    dialogTagVisible,
+    tagContextMenu,
+    tagDialogMode,
+    tagDialogExisting,
+    tagDialogNew,
+  ])
 
   const filteredMailList = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase()
     return mailList.filter((item) => {
       const tab = normalizeTabName(item.tab || DEFAULT_TAB)
       if (tab !== activeTab) return false
+      const itemTags = normalizeTags(item.tags || [])
+      if (selectByTags.length > 0 && !selectByTags.some((tag) => itemTags.includes(tag))) {
+        return false
+      }
       if (keyword === "") return true
-      return item.email.toLowerCase().includes(keyword) || item.password.toLowerCase().includes(keyword)
+      return item.email.toLowerCase().includes(keyword)
+        || item.password.toLowerCase().includes(keyword)
+        || (item.remark || "").toLowerCase().includes(keyword)
+        || itemTags.some((tag) => tag.includes(keyword))
     })
-  }, [mailList, activeTab, searchKeyword])
+  }, [mailList, activeTab, searchKeyword, selectByTags])
 
   const pageTotal = filteredMailList.length
   const pageCount = Math.max(1, Math.ceil(pageTotal / pageSize))
@@ -430,17 +301,139 @@ function App() {
     return filteredMailList.slice(start, start + pageSize)
   }, [filteredMailList, clampedPage, pageSize])
 
+  const tagOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const output: string[] = []
+    for (const item of mailList) {
+      if (normalizeTabName(item.tab || DEFAULT_TAB) !== activeTab) continue
+      for (const tag of item.tags || []) {
+        const next = normalizeTag(tag)
+        if (next === "" || seen.has(next)) continue
+        seen.add(next)
+        output.push(next)
+      }
+    }
+    return output.sort((a, b) => a.localeCompare(b))
+  }, [mailList, activeTab])
+
+  const allTagOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const output: string[] = []
+    for (const item of mailList) {
+      for (const tag of item.tags || []) {
+        const next = normalizeTag(tag)
+        if (next === "" || seen.has(next)) continue
+        seen.add(next)
+        output.push(next)
+      }
+    }
+    return output.sort((a, b) => a.localeCompare(b))
+  }, [mailList])
+
+  const dialogTagOptions = useMemo(() => {
+    if (tagDialogMode === "add") return allTagOptions
+    if (!tagDialogRow) return []
+    const current = mailList.find((item) => item.email === tagDialogRow.email)
+    return normalizeTags(current?.tags || tagDialogRow.tags || [])
+  }, [tagDialogMode, tagDialogRow, allTagOptions, mailList])
+
+  useEffect(() => {
+    setSelectByTags((prev) => prev.filter((tag) => tagOptions.includes(tag)))
+  }, [tagOptions])
+
+  useEffect(() => {
+    if (!dialogTagVisible) return
+    setTagDialogExisting((prev) => {
+      const filtered = prev.filter((tag) => dialogTagOptions.includes(tag))
+      if (filtered.length === prev.length && filtered.every((tag, idx) => tag === prev[idx])) {
+        return prev
+      }
+      return filtered
+    })
+  }, [dialogTagVisible, dialogTagOptions])
+
   useEffect(() => {
     setCurrentPage(1)
-  }, [activeTab, searchKeyword])
+  }, [activeTab, searchKeyword, selectByTags])
 
   function saveMailList(next: Email[]) {
     const normalized = normalizeEmailList(next)
     const mergedTabs = normalizeTabs([...tabs, ...normalized.map((item) => item.tab || DEFAULT_TAB)])
     setMailList(normalized)
     setTabs(mergedTabs)
-    localStorage.setItem(MAIL_STORAGE_KEY, JSON.stringify(normalized))
-    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(mergedTabs))
+  }
+
+  function clearMailCacheForEmails(emails: string[]) {
+    if (emails.length === 0) return
+    const targets = new Set(emails.map((item) => item.toLowerCase()))
+    const targetList = Array.from(targets)
+    setMailCache((prev) => {
+      const next: Record<string, Post[]> = {}
+      for (const key of Object.keys(prev)) {
+        const lowerKey = key.toLowerCase()
+        const matched = targetList.some((email) => lowerKey.startsWith(email))
+        if (!matched) {
+          next[key] = prev[key]
+        }
+      }
+      return next
+    })
+  }
+
+  function handleSelectByTagsChange(event: ChangeEvent<HTMLSelectElement>) {
+    const next = Array.from(event.target.selectedOptions).map((item) => normalizeTag(item.value))
+    setSelectByTags(normalizeTags(next))
+  }
+
+  function openTagContextMenu(
+    event: React.MouseEvent<HTMLElement>,
+    source: "filter" | "row",
+    row: Email | null = null,
+    tag = "",
+  ) {
+    event.preventDefault()
+    event.stopPropagation()
+    setTagContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      rowEmail: row?.email || null,
+      tag: normalizeTag(tag),
+      source,
+    })
+  }
+
+  function closeTagContextMenu() {
+    setTagContextMenu(null)
+  }
+
+  async function copyText(value: string) {
+    const text = value.trim()
+    if (text === "") return
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch {
+      const area = document.createElement("textarea")
+      area.value = text
+      document.body.appendChild(area)
+      area.select()
+      document.execCommand("copy")
+      document.body.removeChild(area)
+    }
+  }
+
+  function buildAllEmailInfo(row: Email): string {
+    return [
+      `address: ${row.email}`,
+      `clientID: ${row.client_id}`,
+      `refreshToken: ${row.refresh_token}`,
+      `tag: ${tagsToText(row.tags || [])}`,
+    ].join("\n")
+  }
+
+  function handleTagDialogExistingChange(event: ChangeEvent<HTMLSelectElement>) {
+    const next = Array.from(event.target.selectedOptions).map((item) => normalizeTag(item.value))
+    setTagDialogExisting(normalizeTags(next))
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -461,6 +454,8 @@ function App() {
       client_id: tempArr[2] || "",
       refresh_token: tempArr.slice(3).join(splitSymbol) || "",
       tab: activeTab,
+      remark: "",
+      tags: [],
     }
   }
 
@@ -526,7 +521,6 @@ function App() {
     setActiveTab(nextTab)
     setMoveTargetTab(nextTab)
     setNewTabName("")
-    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(nextTabs))
   }
 
   function handleRenameActiveTab() {
@@ -554,7 +548,6 @@ function App() {
     const updatedTabs = tabs.map((item) => (item === activeTab ? normalizedNextTab : item))
     saveMailList(updatedRows)
     setTabs(normalizeTabs(updatedTabs))
-    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(normalizeTabs(updatedTabs)))
     setActiveTab(normalizedNextTab)
     if (moveTargetTab === activeTab) setMoveTargetTab(normalizedNextTab)
   }
@@ -572,7 +565,6 @@ function App() {
     const nextTabs = tabs.filter((item) => item !== activeTab)
     saveMailList(updatedRows)
     setTabs(normalizeTabs(nextTabs))
-    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(normalizeTabs(nextTabs)))
     setActiveTab(DEFAULT_TAB)
     setMoveTargetTab(DEFAULT_TAB)
     setSelectedEmails([])
@@ -592,6 +584,138 @@ function App() {
     setSelectedEmails([])
   }
 
+  function handleSelectByTag() {
+    setSelectByTags([])
+  }
+
+  function resolveContextRow(): Email | null {
+    if (!tagContextMenu?.rowEmail) return null
+    return mailList.find((item) => item.email === tagContextMenu.rowEmail) || null
+  }
+
+  function handleTagContextCopy() {
+    if (!tagContextMenu) return
+    if (tagContextMenu.source === "filter") {
+      void copyText(selectByTags.join(", "))
+      closeTagContextMenu()
+      return
+    }
+
+    if (tagContextMenu.tag !== "") {
+      void copyText(tagContextMenu.tag)
+      closeTagContextMenu()
+      return
+    }
+
+    const row = resolveContextRow()
+    if (row) {
+      void copyText(tagsToText(row.tags || []))
+    }
+    closeTagContextMenu()
+  }
+
+  function handleTagContextCopyEmail() {
+    const row = resolveContextRow()
+    if (!row) return
+    void copyText(row.email)
+    closeTagContextMenu()
+  }
+
+  function handleTagContextCopyRefreshToken() {
+    const row = resolveContextRow()
+    if (!row) return
+    void copyText(row.refresh_token)
+    closeTagContextMenu()
+  }
+
+  function handleTagContextCopyAllInfo() {
+    const row = resolveContextRow()
+    if (!row) return
+    void copyText(buildAllEmailInfo(row))
+    closeTagContextMenu()
+  }
+
+  function handleTagContextEdit() {
+    const row = resolveContextRow()
+    if (!row) return
+    handleEdit(row)
+    closeTagContextMenu()
+  }
+
+  function handleTagContextDeleteEmail() {
+    const row = resolveContextRow()
+    if (!row) return
+    handleDelete(row)
+    closeTagContextMenu()
+  }
+
+  function handleTagContextAdd() {
+    if (!tagContextMenu) return
+    if (tagContextMenu.source === "filter") {
+      const raw = window.prompt(t.newTag, "")
+      if (raw === null) {
+        closeTagContextMenu()
+        return
+      }
+      const next = parseTagsInput(raw)
+      if (next.length === 0) {
+        alert(t.tagRequired)
+        return
+      }
+      setSelectByTags((prev) => normalizeTags([...prev, ...next]))
+      closeTagContextMenu()
+      return
+    }
+
+    const row = resolveContextRow()
+    if (row) {
+      openTagDialog(row, "add")
+    }
+    closeTagContextMenu()
+  }
+
+  function handleTagContextRemove() {
+    if (!tagContextMenu) return
+    if (tagContextMenu.source === "filter") {
+      const targets = normalizeTags(selectByTags)
+      if (targets.length === 0) {
+        setSelectByTags([])
+        closeTagContextMenu()
+        return
+      }
+      const next = mailList.map((item) => ({
+        ...item,
+        tags: normalizeTags((item.tags || []).filter((tag) => !targets.includes(normalizeTag(tag)))),
+      }))
+      saveMailList(next)
+      setSelectByTags([])
+      closeTagContextMenu()
+      return
+    }
+
+    const row = resolveContextRow()
+    if (!row) {
+      closeTagContextMenu()
+      return
+    }
+
+    if (tagContextMenu.tag !== "") {
+      const next = mailList.map((item) => {
+        if (item.email !== row.email) return item
+        return {
+          ...item,
+          tags: normalizeTags((item.tags || []).filter((tag) => normalizeTag(tag) !== tagContextMenu.tag)),
+        }
+      })
+      saveMailList(next)
+      closeTagContextMenu()
+      return
+    }
+
+    openTagDialog(row, "remove")
+    closeTagContextMenu()
+  }
+
   function handleBatchDelete() {
     if (selectedEmails.length === 0) {
       alert(t.selectEmailsToDelete)
@@ -600,6 +724,7 @@ function App() {
     if (!window.confirm(t.confirmDeleteSelected)) return
     const next = mailList.filter((item) => !selectedEmails.includes(item.email))
     saveMailList(next)
+    clearMailCacheForEmails(selectedEmails)
     setSelectedEmails([])
   }
 
@@ -607,10 +732,11 @@ function App() {
     if (!window.confirm(t.confirmDeleteAll)) return
     saveMailList([])
     setTabs([DEFAULT_TAB])
-    localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify([DEFAULT_TAB]))
     setActiveTab(DEFAULT_TAB)
     setMoveTargetTab(DEFAULT_TAB)
+    setSelectByTags([])
     setSelectedEmails([])
+    setMailCache({})
   }
 
   function exportRows(rows: Email[], fileNameValue: string) {
@@ -650,7 +776,7 @@ function App() {
 
   function handleEdit(row: Email) {
     setEditEmail(row.email)
-    setEditForm({ ...row })
+    setEditForm({ ...row, remark: row.remark || "", tags: normalizeTags(row.tags || []) })
     setDialogEditVisible(true)
   }
 
@@ -667,7 +793,94 @@ function App() {
     if (!window.confirm(t.confirmDeleteEmail(row.email))) return
     const next = mailList.filter((item) => item.email !== row.email)
     saveMailList(next)
+    clearMailCacheForEmails([row.email])
     setSelectedEmails((prev) => prev.filter((item) => item !== row.email))
+  }
+
+  function openTagDialog(row: Email, mode: "add" | "remove") {
+    const existing = normalizeTags(row.tags || [])
+    if (mode === "remove" && existing.length === 0) {
+      alert(t.tagNotFound)
+      return
+    }
+    setTagDialogMode(mode)
+    setTagDialogRow(row)
+    setTagDialogNew("")
+    setTagDialogExisting(mode === "remove" ? [] : [])
+    setDialogTagVisible(true)
+  }
+
+  function handleAddTag(row: Email) {
+    openTagDialog(row, "add")
+  }
+
+  function handleRemoveTag(row: Email) {
+    openTagDialog(row, "remove")
+  }
+
+  function closeTagDialog() {
+    setDialogTagVisible(false)
+    setTagDialogRow(null)
+    setTagDialogExisting([])
+    setTagDialogNew("")
+  }
+
+  function handleApplyTagDialog() {
+    if (!tagDialogRow) return
+    const selectedExisting = normalizeTags(tagDialogExisting)
+    const inputTags = parseTagsInput(tagDialogNew)
+
+    const next = mailList.map((item) => {
+      if (item.email !== tagDialogRow.email) return item
+
+      if (tagDialogMode === "add") {
+        const candidate = normalizeTag(tagDialogNew || selectedExisting[0] || "")
+        if (candidate === "") {
+          return item
+        }
+        return {
+          ...item,
+          tags: normalizeTags([...(item.tags || []), candidate]),
+        }
+      }
+
+      const current = normalizeTags(item.tags || [])
+      const targets = normalizeTags([...selectedExisting, ...inputTags])
+      if (targets.length === 0) {
+        return item
+      }
+      const hasAny = targets.some((tag) => current.includes(tag))
+      if (!hasAny) {
+        return item
+      }
+      return {
+        ...item,
+        tags: normalizeTags(current.filter((tag) => !targets.includes(tag))),
+      }
+    })
+
+    if (tagDialogMode === "add") {
+      const candidate = normalizeTag(tagDialogNew || selectedExisting[0] || "")
+      if (candidate === "") {
+        alert(t.tagRequired)
+        return
+      }
+    } else {
+      const targets = normalizeTags([...selectedExisting, ...inputTags])
+      if (targets.length === 0) {
+        alert(t.tagRequired)
+        return
+      }
+      const currentRow = mailList.find((item) => item.email === tagDialogRow.email)
+      const currentTags = normalizeTags(currentRow?.tags || [])
+      if (!targets.some((tag) => currentTags.includes(tag))) {
+        alert(t.tagNotFound)
+        return
+      }
+    }
+
+    saveMailList(next)
+    closeTagDialog()
   }
 
   function handleShowAccount(row: Email) {
@@ -677,57 +890,62 @@ function App() {
 
   async function getPosts(row: Email, mailbox: string) {
     if (postLoading) return
+    const requestID = Date.now()
+    receiveRequestRef.current = requestID
     setPostLoading(true)
+    let userError = ""
     try {
-      const controller = new AbortController()
-      abortRef.current = controller
-      const timeout = window.setTimeout(() => controller.abort(), 15000)
+      const result = await MailAll(
+        row.email,
+        row.password,
+        row.client_id,
+        row.refresh_token,
+        mailbox,
+      )
+      if (receiveRequestRef.current !== requestID) {
+        return
+      }
 
-      const response = await fetch(`${apiBaseURL}/api/mail_all`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          email: row.email,
-          password: row.password,
-          client_id: row.client_id,
-          refresh_token: row.refresh_token,
-          mailbox,
-        }),
-      })
-      window.clearTimeout(timeout)
-
-      const text = await response.text()
+      const text = result?.body || ""
       let data: any = null
       try {
         data = text ? JSON.parse(text) : null
       } catch {
-        throw new Error(text || `HTTP ${response.status}`)
+        throw new Error(text || t.fetchFailed)
       }
 
       if (data && (data.code === 200 || data.code === "200")) {
-        setPostList(data.data || [])
-        localStorage.setItem(`${row.email}${mailbox}`, JSON.stringify(data.data || []))
+        const cacheKey = `${row.email}${mailbox}`
+        const nextPosts = (data.data || []) as Post[]
+        setPostList(nextPosts)
+        setMailCache((prev) => ({ ...prev, [cacheKey]: nextPosts }))
         return
       }
 
+      if ((result?.statusCode || 200) >= 400) {
+        throw new Error(data?.message || t.apiHTTPError(result.statusCode))
+      }
       throw new Error(data?.message || t.fetchFailed)
     } catch (error) {
-      if ((error as Error).name === "AbortError") {
-        alert(t.fetchTimeout)
-      } else {
-        alert((error as Error).message || t.fetchFailed)
+      if (receiveRequestRef.current !== requestID) {
+        return
       }
+      const err = error as Error
+      userError = err.message || t.fetchFailed
     } finally {
-      abortRef.current = null
-      setPostLoading(false)
+      if (receiveRequestRef.current === requestID) {
+        setPostLoading(false)
+      }
+    }
+    if (userError) {
+      alert(userError)
     }
   }
 
   function handleInbox(row: Email) {
     setBoxType("INBOX")
     setNowPost(row)
-    setPostList(safeParseJSON<Post[]>(localStorage.getItem(`${row.email}INBOX`), []))
+    setPostList(mailCache[`${row.email}INBOX`] || [])
     setDialogEmailVisible(true)
     void getPosts(row, "INBOX")
   }
@@ -735,7 +953,7 @@ function App() {
   function handleTrash(row: Email) {
     setBoxType("Junk")
     setNowPost(row)
-    setPostList(safeParseJSON<Post[]>(localStorage.getItem(`${row.email}Junk`), []))
+    setPostList(mailCache[`${row.email}Junk`] || [])
     setDialogEmailVisible(true)
     void getPosts(row, "Junk")
   }
@@ -746,10 +964,7 @@ function App() {
   }
 
   function handleCancelReceive() {
-    if (abortRef.current) {
-      abortRef.current.abort()
-      abortRef.current = null
-    }
+    receiveRequestRef.current = Date.now()
     setPostLoading(false)
   }
 
@@ -757,18 +972,32 @@ function App() {
     if (!nowPost) return
     if (!window.confirm(t.clearMailboxConfirm(nowPost.email))) return
     setPostList([])
-    localStorage.setItem(`${nowPost.email}${boxType}`, JSON.stringify([]))
-    void fetch(`${apiBaseURL}/api/process-mailbox`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: nowPost.email,
-        password: nowPost.password,
-        client_id: nowPost.client_id,
-        refresh_token: nowPost.refresh_token,
-        mailbox: boxType,
-      }),
-    })
+    const cacheKey = `${nowPost.email}${boxType}`
+    setMailCache((prev) => ({ ...prev, [cacheKey]: [] }))
+    void ProcessMailbox(
+      nowPost.email,
+      nowPost.password,
+      nowPost.client_id,
+      nowPost.refresh_token,
+      boxType,
+    )
+      .then((result) => {
+        if ((result?.statusCode || 200) >= 400) {
+          let message = t.apiHTTPError(result.statusCode)
+          if (result?.body) {
+            try {
+              const parsed = JSON.parse(result.body)
+              message = parsed?.message || message
+            } catch {
+              message = result.body
+            }
+          }
+          throw new Error(message)
+        }
+      })
+      .catch((error) => {
+        alert((error as Error).message || t.fetchFailed)
+      })
   }
 
   const postTitle = nowPost ? (boxType === "INBOX" ? t.inboxTitle(nowPost.email) : t.junkTitle(nowPost.email)) : ""
@@ -778,7 +1007,6 @@ function App() {
       <div className="top-nav">
         <div className="top-nav-main">
           <span className="active">{t.mailboxManager}</span>
-          <span className="tabs-label">{t.tabs}</span>
           <div className="tab-list">
             {tabs.map((tab) => (
               <button
@@ -803,17 +1031,17 @@ function App() {
         <div className="lang-switch">
           <label htmlFor="lang-select">{t.language}</label>
           <select id="lang-select" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
-            <option value="en">{t.english}</option>
-            <option value="zh">{t.chinese}</option>
+            <option value="eng">{t.english}</option>
+            <option value="cht">{t.chinese}</option>
           </select>
         </div>
       </div>
 
-      <div className="toolbar">
+      <div className="toolbar main-toolbar">
         <label>{t.separator}</label>
         <input className="field" value={splitSymbol} onChange={(e) => setSplitSymbol(e.target.value)} />
         <label className="btn blue">
-          +{fileName || t.chooseFile}
+          {fileName || t.chooseFile}
           <input type="file" accept=".txt,.csv" hidden onChange={handleFileChange} />
         </label>
         <button className="btn green" onClick={handleAdd}>{t.importEmails}</button>
@@ -827,15 +1055,24 @@ function App() {
         <button className="btn orange" onClick={handleExportAll}>{t.exportAll}</button>
         <button className="btn orange" onClick={handleBatchDelete}>{t.batchDelete}</button>
         <button className="btn red" onClick={handleDeleteAll}>{t.deleteAll}</button>
-      </div>
-
-      <div className="toolbar secondary">
         <input
           className="field search"
           placeholder={t.searchByName}
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
         />
+        <select
+          className="field multi-tags"
+          value={selectByTags}
+          onChange={handleSelectByTagsChange}
+          onContextMenu={(e) => openTagContextMenu(e, "filter")}
+          multiple
+        >
+          {tagOptions.map((tag) => (
+            <option key={`tag-${tag}`} value={tag}>{tag}</option>
+          ))}
+        </select>
+        <button className="btn dark" onClick={handleSelectByTag}>{t.selectTag}</button>
         <label>{t.selectMoveTarget}</label>
         <select className="field mini" value={moveTargetTab} onChange={(e) => setMoveTargetTab(e.target.value)}>
           {tabs.map((tab) => (
@@ -846,22 +1083,25 @@ function App() {
       </div>
 
       <div className="table-wrap">
-        <table>
+        <table className="mail-table">
           <thead>
             <tr>
-              <th style={{ width: 50 }}>
+              <th style={{ width: 40 }}>
                 <input
                   type="checkbox"
                   checked={tableMailList.length > 0 && tableMailList.every((x) => selectedEmails.includes(x.email))}
                   onChange={(e) => handleToggleAll(e.target.checked)}
                 />
               </th>
+              <th className="line-no-col">#</th>
               <th>{t.email}</th>
-              <th style={{ width: 260 }}>{t.actions}</th>
+              <th>{t.remarks}</th>
+              <th>{t.tags}</th>
+              <th style={{ width: 360 }}>{t.actions}</th>
             </tr>
           </thead>
           <tbody>
-            {tableMailList.map((row) => (
+            {tableMailList.map((row, idx) => (
               <tr key={`${row.email}-${row.client_id}`}>
                 <td>
                   <input
@@ -870,13 +1110,35 @@ function App() {
                     onChange={(e) => handleSelectionChange(row.email, e.target.checked)}
                   />
                 </td>
+                <td className="line-no-col">{(clampedPage - 1) * pageSize + idx + 1}</td>
                 <td>
-                  <button className="link-btn" onClick={() => handleShowAccount(row)}>
+                  <button
+                    className="link-btn"
+                    onClick={() => handleShowAccount(row)}
+                    onContextMenu={(e) => openTagContextMenu(e, "row", row)}
+                  >
                     {row.email}
                   </button>
                 </td>
+                <td className="truncate">{row.remark || ""}</td>
+                <td>
+                  <div className="tag-list-cell" onContextMenu={(e) => openTagContextMenu(e, "row", row)}>
+                    {row.tags.length === 0 && <span className="tag-empty">-</span>}
+                    {row.tags.map((tag) => (
+                      <span
+                        key={`${row.email}-${tag}`}
+                        className="tag-chip"
+                        onContextMenu={(e) => openTagContextMenu(e, "row", row, tag)}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </td>
                 <td>
                   <button className="btn-sm blue" onClick={() => handleEdit(row)}>{t.edit}</button>
+                  <button className="btn-sm dark" onClick={() => handleAddTag(row)}>{t.addTag}</button>
+                  <button className="btn-sm orange" onClick={() => handleRemoveTag(row)}>{t.removeTag}</button>
                   <button className="btn-sm green" onClick={() => handleInbox(row)}>{t.inbox}</button>
                   <button className="btn-sm green" onClick={() => handleTrash(row)}>{t.junk}</button>
                   <button className="btn-sm red" onClick={() => handleDelete(row)}>{t.delete}</button>
@@ -889,7 +1151,7 @@ function App() {
 
       <div className="pagination">
         <span>{t.total}: {pageTotal}</span>
-        <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}>
+        <select value={pageSize} onChange={(e) => { setPageSize(normalizePageSize(Number(e.target.value))); setCurrentPage(1) }}>
           <option value={5}>5</option>
           <option value={10}>10</option>
           <option value={20}>20</option>
@@ -900,6 +1162,36 @@ function App() {
         <span>{clampedPage} / {pageCount}</span>
         <button onClick={() => setCurrentPage((p) => Math.min(pageCount, p + 1))}>{t.next}</button>
       </div>
+
+      {tagContextMenu && (
+        <div className="context-menu-layer" onClick={closeTagContextMenu} onContextMenu={(e) => e.preventDefault()}>
+          <div
+            className="context-menu"
+            style={{ left: `${tagContextMenu.x}px`, top: `${tagContextMenu.y}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {tagContextMenu.source === "filter" && (
+              <>
+                <button onClick={handleTagContextCopy}>{t.copy}</button>
+                <button onClick={handleTagContextRemove}>{t.removeTag}</button>
+                <button onClick={handleTagContextAdd}>{t.addTag}</button>
+              </>
+            )}
+            {tagContextMenu.source === "row" && (
+              <>
+                {tagContextMenu.tag !== "" && <button onClick={handleTagContextCopy}>{t.copy}</button>}
+                <button onClick={handleTagContextCopyEmail}>{t.copyEmailAddress}</button>
+                <button onClick={handleTagContextCopyRefreshToken}>{t.copyRefreshToken}</button>
+                <button onClick={handleTagContextCopyAllInfo}>{t.copyAllEmailInfo}</button>
+                <button onClick={handleTagContextEdit}>{t.editMailInfo}</button>
+                <button onClick={handleTagContextDeleteEmail}>{t.removeEmail}</button>
+                <button onClick={handleTagContextRemove}>{t.removeTag}</button>
+                <button onClick={handleTagContextAdd}>{t.addTag}</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {dialogCopyVisible && (
         <div className="modal">
@@ -914,6 +1206,45 @@ function App() {
             <div className="panel-actions">
               <button onClick={() => setDialogCopyVisible(false)}>{t.cancel}</button>
               <button className="btn-sm blue" onClick={handlePasteAdd}>{t.import}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dialogTagVisible && tagDialogRow && (
+        <div className="modal">
+          <div className="panel dialog">
+            <div className="dialog-header">
+              <span className="dialog-title">
+                {tagDialogMode === "add" ? t.tagAddFor(tagDialogRow.email) : t.tagRemoveFor(tagDialogRow.email)}
+              </span>
+              <button className="dialog-close" onClick={closeTagDialog}>×</button>
+            </div>
+            <div className="dialog-body">
+              <label className="field-label">{t.existingTag}</label>
+              <select
+                className={tagDialogMode === "remove" ? "multi-tags" : ""}
+                value={tagDialogExisting}
+                onChange={handleTagDialogExistingChange}
+                multiple={tagDialogMode === "remove"}
+              >
+                {dialogTagOptions.length === 0 && (
+                  <option value="" disabled>{t.noAvailableTags}</option>
+                )}
+                {dialogTagOptions.map((tag) => (
+                  <option key={`dlg-tag-${tag}`} value={tag}>{tag}</option>
+                ))}
+              </select>
+              <label className="field-label">{t.newTag}</label>
+              <input
+                value={tagDialogNew}
+                onChange={(e) => setTagDialogNew(e.target.value)}
+                placeholder={t.tagsInputHint}
+              />
+            </div>
+            <div className="panel-actions">
+              <button onClick={closeTagDialog}>{t.cancel}</button>
+              <button className="btn-sm blue" onClick={handleApplyTagDialog}>{t.applyTag}</button>
             </div>
           </div>
         </div>
@@ -935,6 +1266,10 @@ function App() {
               <input value={editForm.client_id} onChange={(e) => setEditForm((p) => ({ ...p, client_id: e.target.value }))} />
               <label className="field-label">{t.refreshToken}</label>
               <textarea rows={8} value={editForm.refresh_token} onChange={(e) => setEditForm((p) => ({ ...p, refresh_token: e.target.value }))} />
+              <label className="field-label">{t.remark}</label>
+              <input value={editForm.remark || ""} onChange={(e) => setEditForm((p) => ({ ...p, remark: e.target.value }))} />
+              <label className="field-label">{t.tagsInputHint}</label>
+              <input value={tagsToText(editForm.tags || [])} onChange={(e) => setEditForm((p) => ({ ...p, tags: parseTagsInput(e.target.value) }))} />
             </div>
             <div className="panel-actions">
               <button onClick={() => setDialogEditVisible(false)}>{t.cancel}</button>
@@ -1032,6 +1367,10 @@ function App() {
               <input value={accountDetail.client_id} readOnly />
               <label className="field-label">{t.refreshToken}</label>
               <textarea rows={8} value={accountDetail.refresh_token} readOnly />
+              <label className="field-label">{t.remark}</label>
+              <input value={accountDetail.remark || ""} readOnly />
+              <label className="field-label">{t.tags}</label>
+              <input value={tagsToText(accountDetail.tags || [])} readOnly />
             </div>
           </div>
         </div>

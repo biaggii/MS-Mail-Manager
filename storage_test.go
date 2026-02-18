@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -71,7 +72,68 @@ func TestSaveStateCreatesParentDirectories(t *testing.T) {
 		t.Fatalf("saveState returned unexpected error: %v", err)
 	}
 
-	if _, err := os.Stat(filePath); err != nil {
-		t.Fatalf("expected state file to exist: %v", err)
+	dbPath := filepath.Join(filepath.Dir(filePath), sqliteDBFileName)
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("expected sqlite db file to exist: %v", err)
+	}
+}
+
+func TestLoadStateMigratesLegacyJSON(t *testing.T) {
+	dir := t.TempDir()
+	legacyPath := filepath.Join(dir, "state.json")
+
+	legacy := AppState{
+		APIBaseURL: "https://legacy.example.test",
+		Accounts: []Account{
+			{
+				ID:           "acc-legacy",
+				Label:        "Legacy",
+				Email:        "legacy@example.test",
+				ClientID:     "legacy-client",
+				RefreshToken: "legacy-token",
+				Mailbox:      "INBOX",
+			},
+		},
+	}
+
+	content, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatalf("marshal legacy state: %v", err)
+	}
+	if err := os.WriteFile(legacyPath, content, 0o600); err != nil {
+		t.Fatalf("write legacy state file: %v", err)
+	}
+
+	got, err := loadState(legacyPath)
+	if err != nil {
+		t.Fatalf("loadState returned unexpected error: %v", err)
+	}
+	if got.APIBaseURL != legacy.APIBaseURL {
+		t.Fatalf("expected migrated apiBaseURL %q, got %q", legacy.APIBaseURL, got.APIBaseURL)
+	}
+	if len(got.Accounts) != 1 || got.Accounts[0].Email != "legacy@example.test" {
+		t.Fatalf("expected migrated accounts, got %#v", got.Accounts)
+	}
+
+	dbPath := filepath.Join(dir, sqliteDBFileName)
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("expected sqlite db file to exist: %v", err)
+	}
+
+	updatedLegacy := AppState{APIBaseURL: "https://should-not-overwrite.example.test"}
+	content, err = json.Marshal(updatedLegacy)
+	if err != nil {
+		t.Fatalf("marshal updated legacy state: %v", err)
+	}
+	if err := os.WriteFile(legacyPath, content, 0o600); err != nil {
+		t.Fatalf("overwrite legacy state file: %v", err)
+	}
+
+	gotAgain, err := loadState(legacyPath)
+	if err != nil {
+		t.Fatalf("loadState after migration returned unexpected error: %v", err)
+	}
+	if gotAgain.APIBaseURL != legacy.APIBaseURL {
+		t.Fatalf("expected db source of truth %q, got %q", legacy.APIBaseURL, gotAgain.APIBaseURL)
 	}
 }

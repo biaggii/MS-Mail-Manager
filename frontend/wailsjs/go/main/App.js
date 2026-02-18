@@ -10,6 +10,10 @@ export function GetState() {
   return window['go']['main']['App']['GetState']();
 }
 
+export function GetUIState() {
+  return window['go']['main']['App']['GetUIState']();
+}
+
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
@@ -18,12 +22,24 @@ export function ImportAccounts(arg1, arg2) {
   return window['go']['main']['App']['ImportAccounts'](arg1, arg2);
 }
 
+export function MailAll(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['MailAll'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function ProcessMailbox(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ProcessMailbox'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function RunAction(arg1, arg2) {
   return window['go']['main']['App']['RunAction'](arg1, arg2);
 }
 
 export function RunActionWithMailbox(arg1, arg2, arg3) {
   return window['go']['main']['App']['RunActionWithMailbox'](arg1, arg2, arg3);
+}
+
+export function SaveUIState(arg1) {
+  return window['go']['main']['App']['SaveUIState'](arg1);
 }
 
 export function SetAPIBaseURL(arg1) {

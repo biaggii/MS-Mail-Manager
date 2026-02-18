@@ -1,45 +1,33 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
 const defaultAPIBaseURL = "http://127.0.0.1:3000"
 
 func loadState(filePath string) (AppState, error) {
-	content, err := os.ReadFile(filePath)
+	db, err := openSQLiteStorage(sqlitePathFromLegacyPath(filePath))
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return defaultState(), nil
-		}
+		return AppState{}, err
+	}
+	defer db.Close()
+
+	if err := migrateLegacyAppState(db, filePath); err != nil {
 		return AppState{}, err
 	}
 
-	var state AppState
-	if err := json.Unmarshal(content, &state); err != nil {
-		return AppState{}, err
-	}
-
-	return normalizeState(state), nil
+	return dbLoadAppState(db)
 }
 
 func saveState(filePath string, state AppState) error {
-	state = normalizeState(state)
-
-	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
-		return err
-	}
-
-	content, err := json.MarshalIndent(state, "", "  ")
+	db, err := openSQLiteStorage(sqlitePathFromLegacyPath(filePath))
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
-	return os.WriteFile(filePath, content, 0o600)
+	return dbSaveAppState(db, state)
 }
 
 func defaultState() AppState {

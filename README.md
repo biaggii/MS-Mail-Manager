@@ -4,7 +4,7 @@ Desktop mailbox manager built with:
 - Go + Wails v2
 - React + TypeScript (Vite)
 
-The app lets you import Outlook account rows, manage mailbox entries locally, and fetch/view inbox or junk mail through a compatible API server.
+The app lets you import Outlook account rows, manage mailbox entries locally, and fetch/view inbox or junk mail directly from Microsoft services through the built-in Go layer.
 
 ## Features
 
@@ -20,7 +20,8 @@ The app lets you import Outlook account rows, manage mailbox entries locally, an
 ## Project Structure
 
 - `app.go` - Wails-bound Go application logic
-- `api.go` - API action endpoint and payload builders
+- `app_mail.go` - built-in Microsoft Graph mail fetch/clear implementation
+- `api.go` - legacy external API action helpers (kept for compatibility)
 - `storage.go` - local state persistence and normalization
 - `import.go` - account row parser
 - `frontend/` - React + TypeScript UI
@@ -62,20 +63,12 @@ cd frontend
 npm run build
 ```
 
-## Backend API Compatibility
+## Mail Architecture
 
-Current frontend is configured to call:
-
-- `http://127.0.0.1:3000/api/mail_all`
-- `http://127.0.0.1:3000/api/process-mailbox`
-
-You can override frontend API host with:
-
-```bash
-VITE_API_BASE_URL=http://127.0.0.1:3000
-```
-
-The Go app action runner now sends action calls as `POST` JSON (instead of token-in-query URL), improving credential protection in logs/history.
+- No external backend server is required for mailbox fetch/clear.
+- Frontend calls Wails-bound Go methods (`MailAll`, `ProcessMailbox`).
+- Go obtains OAuth token via refresh token and reads/deletes mailbox messages through Microsoft Graph.
+- This removes browser-side CORS/preflight issues from direct `fetch` calls.
 
 ## Data Format For Import
 

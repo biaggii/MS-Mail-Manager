@@ -57,8 +57,33 @@
   padding-top: 0;
 }
 
-.tabs-label {
-  color: #606266;
+.main-toolbar {
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  overflow: hidden;
+}
+
+.main-toolbar label {
+  font-size: 11px;
+}
+
+.main-toolbar .field {
+  height: 26px;
+  width: 92px;
+  min-width: 78px;
+  padding: 0 8px;
+}
+
+.main-toolbar .field.mini {
+  width: 110px;
+  min-width: 96px;
+}
+
+.main-toolbar .btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.1;
 }
 
 .tab-list {
@@ -103,6 +128,17 @@
   width: 140px;
 }
 
+.field.multi-tags {
+  width: 170px;
+  min-height: 70px;
+  padding: 4px 8px;
+}
+
+.panel select.multi-tags {
+  min-height: 90px;
+  padding: 4px 8px;
+}
+
 .field.tab-input {
   width: 140px;
 }
@@ -137,12 +173,21 @@ table {
 th, td {
   border-bottom: 1px solid #ebeef5;
   text-align: left;
-  padding: 9px 8px;
+  padding: 6px 8px;
 }
 
 th {
   color: #909399;
   font-weight: 500;
+}
+
+.line-no-col {
+  width: 26px;
+  min-width: 26px;
+  max-width: 26px;
+  text-align: center;
+  padding-left: 1px;
+  padding-right: 1px;
 }
 
 .truncate {
@@ -156,20 +201,43 @@ th {
   border: none;
   color: #fff;
   border-radius: 3px;
-  padding: 3px 8px;
-  margin-right: 6px;
+  padding: 2px 7px;
+  margin-right: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .btn-sm.blue { background: #409eff; }
 .btn-sm.green { background: #67c23a; }
 .btn-sm.red { background: #f56c6c; }
 .btn-sm.orange { background: #e6a23c; }
+.btn-sm.dark { background: #606266; }
 
 .btn-sm:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.mail-table th,
+.mail-table td {
+  padding: 3px 5px;
+}
+
+.mail-table .btn-sm {
+  padding: 1px 5px;
+  margin-right: 3px;
+  font-size: 10px;
+}
+
+.mail-table .tag-chip {
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.mail-table .link-btn {
+  font-size: 12px;
 }
 
 .pagination {
@@ -243,6 +311,7 @@ th {
 }
 
 .panel input,
+.panel select,
 .panel textarea {
   width: 100%;
   border: 1px solid #dcdfe6;
@@ -294,4 +363,57 @@ th {
 
 .link-btn:hover {
   text-decoration: underline;
+}
+
+.tag-list-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-chip {
+  display: inline-block;
+  border: 1px solid #d9ecff;
+  color: #409eff;
+  background: #ecf5ff;
+  border-radius: 12px;
+  padding: 1px 7px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.tag-empty {
+  color: #c0c4cc;
+}
+
+.context-menu-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1800;
+}
+
+.context-menu {
+  position: fixed;
+  min-width: 190px;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  padding: 6px 0;
+}
+
+.context-menu button {
+  width: 100%;
+  border: none;
+  background: #fff;
+  text-align: left;
+  padding: 8px 12px;
+  min-height: 32px;
+  color: #303133;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.context-menu button:hover {
+  background: #f5f7fa;
 }

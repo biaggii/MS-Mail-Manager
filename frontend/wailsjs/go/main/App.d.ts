@@ -6,13 +6,21 @@ export function DeleteAccount(arg1:string):Promise<main.AppState>;
 
 export function GetState():Promise<main.AppState>;
 
+export function GetUIState():Promise<main.UIState>;
+
 export function Greet(arg1:string):Promise<string>;
 
 export function ImportAccounts(arg1:string,arg2:string):Promise<main.ImportResult>;
 
+export function MailAll(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<main.ActionResult>;
+
+export function ProcessMailbox(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<main.ActionResult>;
+
 export function RunAction(arg1:string,arg2:string):Promise<main.ActionResult>;
 
 export function RunActionWithMailbox(arg1:string,arg2:string,arg3:string):Promise<main.ActionResult>;
+
+export function SaveUIState(arg1:main.UIState):Promise<main.UIState>;
 
 export function SetAPIBaseURL(arg1:string):Promise<main.AppState>;
 

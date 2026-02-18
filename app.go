@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -18,21 +17,26 @@ import (
 
 // App struct
 type App struct {
-	ctx       context.Context
-	mu        sync.Mutex
-	state     AppState
-	statePath string
-	client    *http.Client
+	ctx         context.Context
+	mu          sync.Mutex
+	state       AppState
+	statePath   string
+	uiStatePath string
+	client      *http.Client
+	tokenMu     sync.Mutex
+	tokenAuth   map[string]oauthTokenCacheEntry
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		state:     defaultState(),
-		statePath: defaultStatePath(),
+		state:       defaultState(),
+		statePath:   defaultStatePath(),
+		uiStatePath: defaultUIStatePath(),
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		tokenAuth: map[string]oauthTokenCacheEntry{},
 	}
 }
 
@@ -61,6 +65,18 @@ func (a *App) GetState() AppState {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.state
+}
+
+func (a *App) GetUIState() (UIState, error) {
+	return loadUIState(a.uiStatePath)
+}
+
+func (a *App) SaveUIState(input UIState) (UIState, error) {
+	normalized := normalizeUIState(input)
+	if err := saveUIState(a.uiStatePath, normalized); err != nil {
+		return UIState{}, err
+	}
+	return normalized, nil
 }
 
 func (a *App) SetAPIBaseURL(rawURL string) (AppState, error) {
@@ -334,11 +350,7 @@ func (a *App) executeAction(baseURL string, account Account, action string) (Act
 }
 
 func defaultStatePath() string {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return "ms-mail-manager-state.json"
-	}
-	return filepath.Join(configDir, "MS-Mail-Manager", "state.json")
+	return filepath.Join(dataDirPath(), "state.json")
 }
 
 func generateAccountID() string {
