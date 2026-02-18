@@ -129,7 +129,7 @@ export const translations: Record<Lang, Translations> = {
     pasteImport: "Paste",
     batchExport: "Exp Sel",
     exportAll: "Export All",
-    batchDelete: "Del Sel",
+    batchDelete: "Del Selected",
     deleteAll: "Delete All",
     exportMode: "Exp",
     exportFull: "Full rows",

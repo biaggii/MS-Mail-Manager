@@ -1,112 +1,61 @@
 # MS-Mail-Manager
 
-Desktop mailbox manager built with:
-- Go + Wails v2
-- React + TypeScript (Vite)
+A professional, high-performance desktop mailbox manager for Outlook/Microsoft accounts. Refactored for extreme stability, modern aesthetics, and superior developer experience.
 
-The app lets you import Outlook account rows, manage mailbox entries locally, and fetch/view inbox or junk mail directly from Microsoft services through the built-in Go layer.
+## 🚀 Key Technologies
 
-## Features
+- **Backend:** [Go](https://go.dev/) + [Wails v2](https://wails.io/) (Native Desktop bridge)
+- **Frontend:** [React](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/) (Strict mode)
+- **Styling:** [Tailwind CSS 4](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
+- **Icons:** [Lucide React](https://lucide.dev/)
+- **Database:** [SQLite](https://www.sqlite.org/) (Robust local persistence)
 
-- Bulk import accounts from file or paste text
-- Custom row delimiter (default: `----`)
-- Local account persistence
-- Edit / delete / export account rows
-- Inbox/Junk mail fetch and view
-- Clear mailbox action
-- i18n UI (`English` default, `中文` optional)
-- ESC key closes dialogs in stack order
+## ✨ Core Features
 
-## Project Structure
+- **Modernized Interface:** Sleek, responsive design with a collapsible sidebar and clean typography.
+- **Advanced Account Management:** 
+  - Bulk import via files or text (custom separators like `----`).
+  - Account tagging and categorization.
+  - Grouping via custom Tabs for organized workflows.
+- **Graph API Integration:** Secure, direct connection to Microsoft services for mail fetching (Inbox/Junk).
+- **Efficient Workflows:**
+  - **Right-Click Context Menus:** Native-feel row actions (Copy Email, Manage Tags, Delete).
+  - **Batch Operations:** Mass export, multi-delete, and bulk tab relocation.
+  - **Tag Filter:** Multi-select tag filtering for precise account discovery.
+- **Privacy Focused:** 100% local data storage in SQLite; tokens never leave your machine.
 
-- `app.go` - Wails-bound Go application logic
-- `app_mail.go` - built-in Microsoft Graph mail fetch/clear implementation
-- `api.go` - legacy external API action helpers (kept for compatibility)
-- `storage.go` - local state persistence and normalization
-- `import.go` - account row parser
-- `frontend/` - React + TypeScript UI
+## 📁 Refactored Architecture
 
-## Requirements
+The application has been refactored from a monolithic structure into a modular, maintainable architecture:
 
-- Go 1.21+ (or your configured Go toolchain)
-- Node.js 18+ and npm
-- Wails CLI v2
+- **Logic Layer:** Custom React hook `useMailManager` isolates state management and Go API bridges.
+- **Component Layer:** Decoupled UI components (`Navbar`, `Sidebar`, `MailTable`, `MailToolbar`) for focused development.
+- **Utility Layer:** Centralized `mail-utils` and TypeScript `types` for project-wide consistency.
+- **Persistence Layer:** Structured SQLite schema with automated migrations.
 
-Install Wails CLI if needed:
+## 🛠️ Getting Started
 
+### Prerequisites
+- **Go:** 1.21+
+- **Node.js:** 18+
+- **Wails CLI:** `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+
+### Development
 ```bash
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
-```
-
-## Run In Development
-
-From project root:
-
-```bash
+# Start dev server with hot-reload
 wails dev
 ```
 
-This starts the Go backend and the Vite dev server.
-
-## Build
-
-From project root:
-
+### Build
 ```bash
+# Generate production binary
 wails build
 ```
 
-Frontend-only build:
+## 🔒 Security
+- Industry-standard OAuth2 refresh token handling.
+- Local-only data persistence (`app.db`).
+- No external dependencies for mail fetching (direct Graph API calls via Go).
 
-```bash
-cd frontend
-npm run build
-```
-
-## Mail Architecture
-
-- No external backend server is required for mailbox fetch/clear.
-- Frontend calls Wails-bound Go methods (`MailAll`, `ProcessMailbox`).
-- Go obtains OAuth token via refresh token and reads/deletes mailbox messages through Microsoft Graph.
-- This removes browser-side CORS/preflight issues from direct `fetch` calls.
-
-## Data Format For Import
-
-Default delimiter is `----`.
-
-Each line:
-
-```text
-email----username_or_label----client_id----refresh_token
-```
-
-Example:
-
-```text
-JoshuaWalker1453@outlook.com----hG0C1LsGKJMDm3----9e5f94bc-e8a4-4e73-b8be-63364c29d753----M.C520_SN1.0.U....
-```
-
-## Quality Checks
-
-Run Go tests:
-
-```bash
-go test ./...
-```
-
-Run frontend production build:
-
-```bash
-cd frontend
-npm run build
-```
-
-## Security Notes
-
-- Do not commit real refresh tokens.
-- Use private repositories for real account data.
-- Avoid sharing exported account files.
-
-## License
-
-Internal / private project unless you add a license file.
+## 📄 License
+Internal / Private.
