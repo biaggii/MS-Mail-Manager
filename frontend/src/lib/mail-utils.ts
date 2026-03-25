@@ -1,8 +1,20 @@
-import { Email, Post } from "../types"
+import { Email, ExportMode } from "../types"
 
 export const DEFAULT_TAB = "Default"
 export const DEFAULT_SPLIT_SYMBOL = "----"
 export const DEFAULT_PAGE_SIZE = 5
+
+export function createEmptyEmail(tab = DEFAULT_TAB): Email {
+  return {
+    email: "",
+    password: "",
+    client_id: "",
+    refresh_token: "",
+    tab,
+    remark: "",
+    tags: [],
+  }
+}
 
 export function normalizeTabName(value: string): string {
   const next = value.trim()
@@ -50,6 +62,43 @@ export function normalizeEmail(row: Email): Email {
 
 export function normalizeEmailList(rows: Email[]): Email[] {
   return rows.map(normalizeEmail)
+}
+
+export function parseImportRows(content: string, splitSymbol: string, activeTab: string): Email[] {
+  return content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(splitSymbol)
+      return normalizeEmail({
+        ...createEmptyEmail(activeTab),
+        email: parts[0] || "",
+        password: parts[1] || "",
+        client_id: parts[2] || "",
+        refresh_token: parts.slice(3).join(splitSymbol) || "",
+      })
+    })
+}
+
+export function buildExportText(rows: Email[], splitSymbol: string, exportMode: ExportMode): string {
+  if (exportMode === "email-only") {
+    return rows.map((row) => row.email).join("\n")
+  }
+
+  return rows
+    .map((row) => `${row.email}${splitSymbol}${row.password}${splitSymbol}${row.client_id}${splitSymbol}${row.refresh_token}`)
+    .join("\n")
+}
+
+export function buildAccountClipboardText(email: Email): string {
+  return [
+    `address: ${email.email}`,
+    `clientID: ${email.client_id}`,
+    `refreshToken: ${email.refresh_token}`,
+    `tag: ${email.tags.join(", ")}`,
+    `remark: ${email.remark || ""}`,
+  ].join("\n")
 }
 
 export function normalizeTabs(input: string[]): string[] {

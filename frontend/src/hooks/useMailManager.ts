@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from "react"
 import { GetUIState, MailAll, ProcessMailbox, SaveUIState } from "../../wailsjs/go/main/App"
 import { Lang, translations } from "../i18n/translations"
-import { Email, Post, ExportMode } from "../types"
+import { Email, Post } from "../types"
 import {
   DEFAULT_TAB,
   DEFAULT_SPLIT_SYMBOL,
