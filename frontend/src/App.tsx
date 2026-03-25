@@ -7,12 +7,8 @@ import { MailTable } from "./components/layout/MailTable"
 import { Modals } from "./components/layout/Modals"
 import { Email, Post, ExportMode } from "./types"
 import { 
-  normalizeEmailList, 
   normalizeTabs, 
-  normalizeTabName, 
   DEFAULT_TAB, 
-  tagsToText, 
-  parseTagsInput 
 } from "./lib/mail-utils"
 import { toast } from "sonner"
 import bgArt from "./assets/BG.jpg"

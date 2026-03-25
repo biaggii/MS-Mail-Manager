@@ -12,15 +12,7 @@ import {
   normalizeEmailList,
   normalizeTabs,
   normalizeTags,
-  tagsToText,
 } from "../lib/mail-utils"
-
-function normalizeLangValue(value: string): Lang {
-  const next = value.trim().toLowerCase()
-  if (next === "cht" || next === "zh") return "cht"
-  if (next === "eng" || next === "en") return "eng"
-  return "eng"
-}
 
 export function useMailManager() {
   const [lang, setLang] = useState<Lang>("eng")
@@ -51,7 +43,7 @@ export function useMailManager() {
         const savedTab = normalizeTabName(stored?.activeTab || DEFAULT_TAB)
         const resolvedTab = mergedTabs.includes(savedTab) ? savedTab : mergedTabs[0]
 
-        setLang(normalizeLangValue(stored?.lang || "eng"))
+        setLang(normalizeLang(stored?.lang || "eng") as Lang)
         setSplitSymbol((stored?.splitSymbol || DEFAULT_SPLIT_SYMBOL).trim() || DEFAULT_SPLIT_SYMBOL)
         setMailList(loadedList)
         setTabs(mergedTabs)

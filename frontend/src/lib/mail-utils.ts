@@ -29,14 +29,6 @@ export function normalizeTags(tags: string[]): string[] {
   return output
 }
 
-export function parseTagsInput(value: string): string[] {
-  return normalizeTags(value.split(","))
-}
-
-export function tagsToText(tags: string[]): string {
-  return normalizeTags(tags).join(", ")
-}
-
 export function normalizeLang(value: string): "eng" | "cht" {
   const next = value.trim().toLowerCase()
   if (next === "cht" || next === "zh") return "cht"

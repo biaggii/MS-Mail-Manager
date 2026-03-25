@@ -47,3 +47,4 @@ Data/
 *.tmp
 *.bak
 .gocache/
+.gotmp/
