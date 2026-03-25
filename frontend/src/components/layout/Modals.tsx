@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,7 +24,7 @@ import { Email, Post } from "../../types"
 import { Translations } from "../../i18n/translations"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-import { Mail, RefreshCcw, X, Trash2, Eye, User, Key, FileText, Tag, Edit2, Copy } from "lucide-react"
+import { Mail, RefreshCcw, X, Trash2, Eye, User, Key, FileText, Tag, Edit2, Copy, AlertCircle, Sparkles } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface ModalsProps {
@@ -32,6 +33,7 @@ interface ModalsProps {
   // Paste Import
   pasteVisible: boolean
   setPasteVisible: (v: boolean) => void
+  splitSymbol: string
   pasteContent: string
   setPasteContent: (v: string) => void
   onPasteImport: () => void
@@ -46,8 +48,9 @@ interface ModalsProps {
   // Tags
   tagVisible: boolean
   setTagVisible: (v: boolean) => void
-  tagMode: "add" | "remove"
+  tagMode: "add" | "remove" | "rename"
   tagRow: Email | null
+  tagTarget: string
   tagExisting: string[]
   setTagExisting: (v: string[]) => void
   tagNew: string
@@ -79,36 +82,110 @@ interface ModalsProps {
 
 export function Modals({
   t,
-  pasteVisible, setPasteVisible, pasteContent, setPasteContent, onPasteImport,
+  pasteVisible, setPasteVisible, splitSymbol, pasteContent, setPasteContent, onPasteImport,
   editVisible, setEditVisible, editForm, setEditForm, onSave,
-  tagVisible, setTagVisible, tagMode, tagRow, tagExisting, setTagExisting, tagNew, setTagNew, onApplyTag, tagOptions,
+  tagVisible, setTagVisible, tagMode, tagRow, tagTarget, tagExisting, setTagExisting, tagNew, setTagNew, onApplyTag, tagOptions,
   emailListVisible, setEmailListVisible, postList, postLoading, postTitle, onReceive, onCancelReceive, onClear, onViewPost,
   postContentVisible, setPostContentVisible, postContent,
   accountDetailVisible, setAccountDetailVisible, accountDetail,
 }: ModalsProps) {
+  const pasteStats = useMemo(() => {
+    const rows = pasteContent.split("\n").map((line) => line.trim()).filter(Boolean)
+    const seenEmails = new Set<string>()
+    let valid = 0
+    let invalid = 0
+    let duplicates = 0
+
+    for (const row of rows) {
+      const parts = row.split(splitSymbol)
+      const email = (parts[0] || "").trim().toLowerCase()
+      const clientID = (parts[2] || "").trim()
+      const refreshToken = parts.slice(3).join(splitSymbol).trim()
+      const isValid = email !== "" && clientID !== "" && refreshToken !== ""
+
+      if (!isValid) {
+        invalid++
+        continue
+      }
+
+      valid++
+      if (seenEmails.has(email)) {
+        duplicates++
+      } else {
+        seenEmails.add(email)
+      }
+    }
+
+    return {
+      rows: rows.length,
+      valid,
+      invalid,
+      duplicates,
+    }
+  }, [pasteContent, splitSymbol])
+
   return (
     <>
       {/* Paste Import */}
       <Dialog open={pasteVisible} onOpenChange={setPasteVisible}>
-        <DialogContent className="sm:max-w-[800px] p-0 overflow-hidden rounded-xl border-none shadow-2xl">
-          <DialogHeader className="p-6 bg-primary/5 border-b">
+        <DialogContent className="sm:max-w-[920px] max-h-[min(92vh,860px)] flex flex-col gap-0 p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
+          <DialogHeader className="p-6 bg-gradient-to-r from-primary/8 via-primary/4 to-transparent border-b">
             <DialogTitle className="flex items-center gap-2 text-xl font-bold tracking-tight">
               <FileText className="h-5 w-5 text-primary" />
               {t.pasteImportTitle}
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground/80 font-medium">{t.tabPlaceholder}</DialogDescription>
+            <DialogDescription className="text-muted-foreground/80 font-medium">
+              {t.pasteImportDescription}
+            </DialogDescription>
           </DialogHeader>
-          <div className="p-6 space-y-4 bg-background">
+          <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5 bg-background">
+            <div className="grid gap-4 md:grid-cols-[1.5fr,1fr]">
+              <div className="rounded-2xl border bg-muted/20 p-4 shadow-sm">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  {t.pasteImportFormatTitle}
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{t.pasteImportFormatHint(splitSymbol)}</p>
+                <div className="mt-3 rounded-xl bg-background px-3 py-3 font-mono text-xs leading-6 text-foreground ring-1 ring-border/60">
+                  {t.pasteImportExample(splitSymbol)}
+                </div>
+              </div>
+              <div className="rounded-2xl border bg-background p-4 shadow-sm">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <AlertCircle className="h-4 w-4 text-orange-500" />
+                  {t.import}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs font-semibold">
+                    {t.pasteImportRows(pasteStats.rows)}
+                  </Badge>
+                  <Badge variant="secondary" className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-semibold text-green-700">
+                    {t.pasteImportValid(pasteStats.valid)}
+                  </Badge>
+                  <Badge variant="secondary" className="rounded-full bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-700">
+                    {t.pasteImportInvalid(pasteStats.invalid)}
+                  </Badge>
+                  <Badge variant="secondary" className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-700">
+                    {t.pasteImportDuplicates(pasteStats.duplicates)}
+                  </Badge>
+                </div>
+              </div>
+            </div>
             <Textarea
-              className="min-h-[400px] font-mono text-sm shadow-inner ring-1 ring-border/50 focus-visible:ring-primary/30"
-              placeholder="email----password----clientID----refreshToken"
+              className="min-h-[260px] rounded-2xl border-0 bg-muted/15 font-mono text-sm leading-6 shadow-inner ring-1 ring-border/60 focus-visible:ring-2 focus-visible:ring-primary/30"
+              placeholder={t.pasteImportTextareaPlaceholder(splitSymbol)}
               value={pasteContent}
               onChange={(e) => setPasteContent(e.target.value)}
             />
           </div>
-          <DialogFooter className="p-6 bg-muted/20 border-t gap-3">
+          <DialogFooter className="shrink-0 p-6 bg-muted/20 border-t gap-3 sm:justify-between">
+            <div className="max-w-[60%] text-sm text-muted-foreground">
+              {t.pasteImportFormatHint(splitSymbol)}
+            </div>
             <Button variant="outline" onClick={() => setPasteVisible(false)} className="px-6 font-semibold">{t.cancel}</Button>
-            <Button onClick={onPasteImport} className="px-8 font-bold shadow-lg shadow-primary/20">{t.import}</Button>
+            <Button onClick={onPasteImport} className="px-8 font-bold shadow-lg shadow-primary/20">
+              {t.importAccounts(pasteStats.valid)}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -166,42 +243,89 @@ export function Modals({
       {/* Tag Dialog */}
       <Dialog open={tagVisible} onOpenChange={setTagVisible}>
         <DialogContent className="sm:max-w-[450px] p-0 rounded-xl overflow-hidden border-none shadow-2xl">
-          <DialogHeader className={cn("p-6 border-b", tagMode === "add" ? "bg-green-500/5" : "bg-red-500/5")}>
+          <DialogHeader className={cn(
+            "p-6 border-b",
+            tagMode === "add"
+              ? "bg-green-500/5"
+              : tagMode === "rename"
+                ? "bg-blue-500/5"
+                : "bg-red-500/5",
+          )}>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-               <Tag className={cn("h-5 w-5", tagMode === "add" ? "text-green-500" : "text-red-500")} />
-               {tagMode === "add" ? t.tagAddFor(tagRow?.email || "") : t.tagRemoveFor(tagRow?.email || "")}
+               <Tag className={cn(
+                 "h-5 w-5",
+                 tagMode === "add"
+                   ? "text-green-500"
+                   : tagMode === "rename"
+                     ? "text-blue-500"
+                     : "text-red-500",
+               )} />
+               {tagMode === "add"
+                 ? t.tagAddFor(tagRow?.email || "")
+                 : tagMode === "rename"
+                   ? t.tagRenameFor(tagRow?.email || "")
+                   : t.tagRemoveFor(tagRow?.email || "")}
             </DialogTitle>
           </DialogHeader>
           <div className="p-6 space-y-6 bg-background">
-            <div className="space-y-3">
-              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t.existingTag}</Label>
-              <Select
-                value={tagExisting[0] || ""}
-                onValueChange={(v) => setTagExisting([v])}
-              >
-                <SelectTrigger className="w-full h-11 shadow-sm">
-                  <SelectValue placeholder={t.noAvailableTags} />
-                </SelectTrigger>
-                <SelectContent>
-                  {tagOptions.map((tag) => (
-                    <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-3">
-              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t.newTag}</Label>
-              <Input
-                placeholder={t.tagsInputHint}
-                value={tagNew}
-                onChange={(e) => setTagNew(e.target.value)}
-                className="h-11 shadow-sm focus-visible:ring-primary/20"
-              />
-            </div>
+            {tagMode === "rename" ? (
+              <>
+                <div className="space-y-3">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t.currentTag}</Label>
+                  <Input value={tagTarget} disabled className="h-11 shadow-sm" />
+                </div>
+                <div className="space-y-3">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t.newTag}</Label>
+                  <Input
+                    placeholder={t.newTag}
+                    value={tagNew}
+                    onChange={(e) => setTagNew(e.target.value)}
+                    className="h-11 shadow-sm focus-visible:ring-primary/20"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t.existingTag}</Label>
+                  <Select
+                    value={tagExisting[0] || ""}
+                    onValueChange={(v) => setTagExisting([v])}
+                  >
+                    <SelectTrigger className="w-full h-11 shadow-sm">
+                      <SelectValue placeholder={t.noAvailableTags} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tagOptions.map((tag) => (
+                        <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {tagMode === "add" ? (
+                  <div className="space-y-3">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t.newTag}</Label>
+                    <Input
+                      placeholder={t.tagsInputHint}
+                      value={tagNew}
+                      onChange={(e) => setTagNew(e.target.value)}
+                      className="h-11 shadow-sm focus-visible:ring-primary/20"
+                    />
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
           <DialogFooter className="p-6 bg-muted/20 border-t gap-3">
             <Button variant="outline" onClick={() => setTagVisible(false)} className="px-6 font-semibold">{t.cancel}</Button>
-            <Button onClick={onApplyTag} className={cn("px-8 font-bold shadow-lg transition-all", tagMode === "add" ? "bg-green-500 hover:bg-green-600 shadow-green-500/20" : "bg-red-500 hover:bg-red-600 shadow-red-500/20")}>
+            <Button onClick={onApplyTag} className={cn(
+              "px-8 font-bold shadow-lg transition-all",
+              tagMode === "add"
+                ? "bg-green-500 hover:bg-green-600 shadow-green-500/20"
+                : tagMode === "rename"
+                  ? "bg-blue-500 hover:bg-blue-600 shadow-blue-500/20"
+                  : "bg-red-500 hover:bg-red-600 shadow-red-500/20",
+            )}>
               {t.applyTag}
             </Button>
           </DialogFooter>

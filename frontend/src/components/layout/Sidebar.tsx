@@ -39,22 +39,23 @@ export function Sidebar({
 
   return (
     <div className={cn(
-      "flex h-full flex-col border-r bg-muted/20 shrink-0 transition-all duration-300",
+      "neon-divider shrink-0 border-r bg-[linear-gradient(180deg,rgba(18,10,34,0.12),rgba(9,5,18,0.03))] transition-all duration-300",
+      "flex h-full flex-col",
       isSidebarOpen ? "w-64" : "w-0 overflow-hidden"
     )}>
-      <div className="p-4 border-b">
-        <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
+      <div className="neon-divider border-b p-4">
+        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white/90">
           <Folder className="h-4 w-4 text-primary" />
           {t.tabs}
         </h2>
         <form onSubmit={handleAddTab} className="flex gap-2">
           <Input
-            className="h-8 text-xs focus-visible:ring-1"
+            className="h-8 rounded-xl border-white/8 bg-black/12 text-xs focus-visible:ring-1"
             placeholder={t.tabPlaceholder}
             value={newTabName}
             onChange={(e) => setNewTabName(e.target.value)}
           />
-          <Button type="submit" size="icon" variant="outline" className="h-8 w-8 shrink-0">
+          <Button type="submit" size="icon" variant="outline" className="h-8 w-8 shrink-0 rounded-xl border-white/8 bg-black/12 hover:bg-white/8">
             <FolderPlus className="h-4 w-4" />
           </Button>
         </form>
@@ -65,8 +66,11 @@ export function Sidebar({
           <div
             key={tab}
             className={cn(
-              "group relative flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all hover:bg-accent hover:text-accent-foreground cursor-pointer",
-              tab === activeTab ? "bg-accent/80 text-accent-foreground shadow-sm ring-1 ring-border/50" : "text-muted-foreground"
+              "group relative flex cursor-pointer items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium transition-all",
+              "hover:bg-white/8 hover:text-white",
+              tab === activeTab
+                ? "bg-[linear-gradient(90deg,rgba(189,80,255,0.24),rgba(89,31,159,0.22))] text-white shadow-[0_12px_34px_rgba(109,35,177,0.28)] ring-1 ring-primary/35"
+                : "text-muted-foreground"
             )}
             onClick={() => onSelectTab(tab)}
           >
@@ -79,7 +83,7 @@ export function Sidebar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-primary transition-colors"
+                  className="h-6 w-6 text-muted-foreground transition-colors hover:bg-white/10 hover:text-primary"
                   onClick={(e) => {
                     e.stopPropagation()
                     onRenameTab(tab)
@@ -90,7 +94,7 @@ export function Sidebar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-destructive transition-colors"
+                  className="h-6 w-6 text-muted-foreground transition-colors hover:bg-white/10 hover:text-destructive"
                   onClick={(e) => {
                     e.stopPropagation()
                     onDeleteTab(tab)

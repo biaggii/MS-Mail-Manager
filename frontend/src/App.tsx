@@ -15,6 +15,12 @@ import {
   parseTagsInput 
 } from "./lib/mail-utils"
 import { toast } from "sonner"
+import bgArt from "./assets/BG.jpg"
+
+const INBOX_MAILBOX = "INBOX"
+const JUNK_MAILBOX = "Junk"
+const FETCH_MAILBOXES = [INBOX_MAILBOX, JUNK_MAILBOX] as const
+type MailboxType = typeof FETCH_MAILBOXES[number]
 
 export default function App() {
   const {
@@ -53,14 +59,15 @@ export default function App() {
   })
 
   const [tagVisible, setTagVisible] = useState(false)
-  const [tagMode, setTagMode] = useState<"add" | "remove">("add")
+  const [tagMode, setTagMode] = useState<"add" | "remove" | "rename">("add")
   const [tagRow, setTagRow] = useState<Email | null>(null)
+  const [tagTarget, setTagTarget] = useState("")
   const [tagExisting, setTagExisting] = useState<string[]>([])
   const [tagNew, setTagNew] = useState("")
 
   const [emailListVisible, setEmailListVisible] = useState(false)
   const [postList, setPostList] = useState<Post[]>([])
-  const [boxType, setBoxType] = useState("INBOX")
+  const [boxType, setBoxType] = useState<MailboxType>(INBOX_MAILBOX)
   const [nowPostEmail, setNowPostEmail] = useState<Email | null>(null)
 
   const [postContentVisible, setPostContentVisible] = useState(false)
@@ -256,52 +263,81 @@ export default function App() {
   const handleAddTagModal = (email: Email) => {
     setTagMode("add")
     setTagRow(email)
+    setTagTarget("")
     setTagNew("")
     setTagExisting([])
     setTagVisible(true)
   }
 
-  const handleRemoveTagModal = (email: Email) => {
+  const handleRemoveTagModal = (email: Email, tag?: string) => {
     if (email.tags.length === 0) {
         toast.error(t.tagNotFound)
         return
     }
     setTagMode("remove")
     setTagRow(email)
+    setTagTarget(tag || "")
     setTagNew("")
-    setTagExisting([])
+    setTagExisting(tag ? [tag] : [])
+    setTagVisible(true)
+  }
+
+  const handleRenameTagModal = (email: Email, tag: string) => {
+    setTagMode("rename")
+    setTagRow(email)
+    setTagTarget(tag)
+    setTagExisting([tag])
+    setTagNew(tag)
     setTagVisible(true)
   }
 
   const handleApplyTag = () => {
     if (!tagRow) return
-    const tagsToAdd = tagNew.split(",").map(t => t.trim()).filter(Boolean)
-    const tagsToProcess = [...tagExisting, ...tagsToAdd]
-    
-    if (tagsToProcess.length === 0) {
-        toast.error(t.tagRequired)
-        return
+    const tagsFromInput = tagNew.split(",").map(t => t.trim()).filter(Boolean)
+    const tagsToProcess = [...tagExisting, ...tagsFromInput]
+
+    if (tagMode === "rename") {
+        const nextTag = tagNew.trim()
+        if (!tagTarget || !nextTag) {
+            toast.error(t.tagRequired)
+            return
+        }
+        setMailList(mailList.map(m => {
+            if (m.email !== tagRow.email) return m
+            return {
+              ...m,
+              tags: Array.from(new Set(m.tags.map(tag => tag === tagTarget ? nextTag : tag))),
+            }
+        }))
+    } else {
+        if (tagsToProcess.length === 0) {
+            toast.error(t.tagRequired)
+            return
+        }
+
+        setMailList(mailList.map(m => {
+            if (m.email !== tagRow.email) return m
+            if (tagMode === "add") {
+                return { ...m, tags: Array.from(new Set([...m.tags, ...tagsToProcess])) }
+            }
+            return { ...m, tags: m.tags.filter(t => !tagsToProcess.includes(t)) }
+        }))
     }
 
-    setMailList(mailList.map(m => {
-        if (m.email !== tagRow.email) return m
-        if (tagMode === "add") {
-            return { ...m, tags: Array.from(new Set([...m.tags, ...tagsToProcess])) }
-        } else {
-            return { ...m, tags: m.tags.filter(t => !tagsToProcess.includes(t)) }
-        }
-    }))
     setTagVisible(false)
+    setTagTarget("")
+    setTagExisting([])
+    setTagNew("")
     toast.success(t.applyTag)
   }
 
   const handleInbox = async (email: Email) => {
-    setBoxType("INBOX")
+    setBoxType(INBOX_MAILBOX)
     setNowPostEmail(email)
-    setPostList(mailCache[`${email.email}INBOX`] || [])
+    setPostList(mailCache[`${email.email}${INBOX_MAILBOX}`] || [])
     setEmailListVisible(true)
     try {
-        const posts = await fetchMails(email, "INBOX")
+        const posts = await fetchMails(email, INBOX_MAILBOX)
         setPostList(posts)
     } catch (e) {
         toast.error((e as Error).message)
@@ -309,22 +345,33 @@ export default function App() {
   }
 
   const handleJunk = async (email: Email) => {
-    setBoxType("Junk")
+    setBoxType(JUNK_MAILBOX)
     setNowPostEmail(email)
-    setPostList(mailCache[`${email.email}Junk`] || [])
+    setPostList(mailCache[`${email.email}${JUNK_MAILBOX}`] || [])
     setEmailListVisible(true)
     try {
-        const posts = await fetchMails(email, "Junk")
+        const posts = await fetchMails(email, JUNK_MAILBOX)
         setPostList(posts)
     } catch (e) {
         toast.error((e as Error).message)
     }
   }
 
+  const refreshMailboxPair = async (email: Email) => {
+    const refreshedPosts: Partial<Record<MailboxType, Post[]>> = {}
+
+    for (const mailbox of FETCH_MAILBOXES) {
+      refreshedPosts[mailbox] = await fetchMails(email, mailbox)
+    }
+
+    return refreshedPosts
+  }
+
   const handleReceive = async () => {
     if (!nowPostEmail) return
     try {
-        const posts = await fetchMails(nowPostEmail, boxType)
+        const refreshedPosts = await refreshMailboxPair(nowPostEmail)
+        const posts = refreshedPosts[boxType] || []
         setPostList(posts)
         toast.success(t.fetchNewMail + " (" + posts.length + ")")
     } catch (e) {
@@ -357,99 +404,111 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-background overflow-hidden font-sans antialiased">
-      <Navbar t={t} lang={lang} onLangChange={setLang} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
-      
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar 
-          t={t}
-          tabs={tabs}
-          activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          onAddTab={handleAddTab}
-          onRenameTab={handleRenameTab}
-          onDeleteTab={handleDeleteTab}
-          isSidebarOpen={isSidebarOpen}
-        />
-        
-        <main className="flex-1 flex flex-col overflow-hidden bg-muted/5">
-          <MailToolbar 
-            t={t}
-            splitSymbol={splitSymbol}
-            setSplitSymbol={setSplitSymbol}
-            onPasteImport={() => setPasteVisible(true)}
-            onFileImport={handleFileImport}
-            exportMode={exportMode}
-            setExportMode={setExportMode}
-            onBatchExport={handleBatchExport}
-            onExportAll={handleExportAll}
-            onBatchDelete={handleBatchDelete}
-            onDeleteAll={handleDeleteAll}
-            searchKeyword={searchKeyword}
-            setSearchKeyword={setSearchKeyword}
-            tagOptions={tagOptions}
-            selectByTags={selectByTags}
-            onSelectTagsChange={setSelectByTags}
-            onClearTags={() => setSelectByTags([])}
-            moveTargetTab={moveTargetTab}
-            setMoveTargetTab={setMoveTargetTab}
-            onMoveSelected={handleMoveSelected}
-            tabs={tabs}
-          />
+    <div className="relative h-screen w-full overflow-hidden text-foreground antialiased">
+      <div className="absolute inset-0">
+        <img src={bgArt} alt="" className="h-full w-full object-cover object-center opacity-90 saturate-140" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,96,226,0.22),transparent_36%),radial-gradient(circle_at_78%_14%,rgba(137,61,255,0.28),transparent_30%),radial-gradient(circle_at_bottom,rgba(64,10,108,0.18),transparent_48%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(9,3,20,0.18),rgba(16,8,31,0.06),rgba(4,1,10,0.22))]" />
+      </div>
+
+      <div className="relative flex h-full flex-col p-3">
+        <div className="relative flex h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,9,35,0.22),rgba(9,4,18,0.32))] shadow-[0_30px_120px_rgba(73,0,128,0.45)] ring-1 ring-white/8">
+          <Navbar t={t} lang={lang} onLangChange={setLang} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
           
-          <div className="flex-1 overflow-hidden relative">
-            <MailTable 
+          <div className="relative flex flex-1 overflow-hidden">
+            <Sidebar 
               t={t}
-              emails={tableMailList}
-              selectedEmails={selectedEmails}
-              onToggleAll={(checked) => {
-                const emails = tableMailList.map(e => e.email)
-                if (checked) setSelectedEmails(Array.from(new Set([...selectedEmails, ...emails])))
-                else setSelectedEmails(selectedEmails.filter(e => !emails.includes(e)))
-              }}
-              onToggleEmail={(email, checked) => {
-                if (checked) setSelectedEmails([...selectedEmails, email])
-                else setSelectedEmails(selectedEmails.filter(e => e !== email))
-              }}
-              onEdit={handleEdit}
-              onAddTag={handleAddTagModal}
-              onRemoveTag={handleRemoveTagModal}
-              onInbox={handleInbox}
-              onJunk={handleJunk}
-              onDelete={(email) => {
-                if (window.confirm(t.confirmDeleteEmail(email.email))) {
-                    setMailList(mailList.filter(m => m.email !== email.email))
-                    toast.success(t.delete + " " + email.email)
-                }
-              }}
-              onShowDetail={(email) => {
-                setAccountDetail(email)
-                setAccountDetailVisible(true)
-              }}
-              onCopyEmail={(email) => {
-                navigator.clipboard.writeText(email)
-                toast.success(t.copyEmailAddress)
-              }}
-              onCopyRefreshToken={(token) => {
-                navigator.clipboard.writeText(token)
-                toast.success(t.copyRefreshToken)
-              }}
-              onCopyAll={handleCopyAll}
-              currentPage={currentPage}
-              pageCount={pageCount}
-              pageSize={pageSize}
-              totalCount={filteredMailList.length}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+              tabs={tabs}
+              activeTab={activeTab}
+              onSelectTab={setActiveTab}
+              onAddTab={handleAddTab}
+              onRenameTab={handleRenameTab}
+              onDeleteTab={handleDeleteTab}
+              isSidebarOpen={isSidebarOpen}
             />
+            
+            <main className="flex-1 flex flex-col overflow-hidden bg-transparent">
+              <MailToolbar 
+                t={t}
+                splitSymbol={splitSymbol}
+                setSplitSymbol={setSplitSymbol}
+                onPasteImport={() => setPasteVisible(true)}
+                onFileImport={handleFileImport}
+                exportMode={exportMode}
+                setExportMode={setExportMode}
+                onBatchExport={handleBatchExport}
+                onExportAll={handleExportAll}
+                onBatchDelete={handleBatchDelete}
+                onDeleteAll={handleDeleteAll}
+                searchKeyword={searchKeyword}
+                setSearchKeyword={setSearchKeyword}
+                tagOptions={tagOptions}
+                selectByTags={selectByTags}
+                onSelectTagsChange={setSelectByTags}
+                onClearTags={() => setSelectByTags([])}
+                moveTargetTab={moveTargetTab}
+                setMoveTargetTab={setMoveTargetTab}
+                onMoveSelected={handleMoveSelected}
+                tabs={tabs}
+              />
+              
+              <div className="flex-1 overflow-hidden relative">
+                <MailTable 
+                  t={t}
+                  emails={tableMailList}
+                  selectedEmails={selectedEmails}
+                  onToggleAll={(checked) => {
+                    const emails = tableMailList.map(e => e.email)
+                    if (checked) setSelectedEmails(Array.from(new Set([...selectedEmails, ...emails])))
+                    else setSelectedEmails(selectedEmails.filter(e => !emails.includes(e)))
+                  }}
+                  onToggleEmail={(email, checked) => {
+                    if (checked) setSelectedEmails([...selectedEmails, email])
+                    else setSelectedEmails(selectedEmails.filter(e => e !== email))
+                  }}
+                  onEdit={handleEdit}
+                  onAddTag={handleAddTagModal}
+                  onRemoveTag={handleRemoveTagModal}
+                  onRenameTag={handleRenameTagModal}
+                  onInbox={handleInbox}
+                  onJunk={handleJunk}
+                  onDelete={(email) => {
+                    if (window.confirm(t.confirmDeleteEmail(email.email))) {
+                        setMailList(mailList.filter(m => m.email !== email.email))
+                        toast.success(t.delete + " " + email.email)
+                    }
+                  }}
+                  onShowDetail={(email) => {
+                    setAccountDetail(email)
+                    setAccountDetailVisible(true)
+                  }}
+                  onCopyEmail={(email) => {
+                    navigator.clipboard.writeText(email)
+                    toast.success(t.copyEmailAddress)
+                  }}
+                  onCopyRefreshToken={(token) => {
+                    navigator.clipboard.writeText(token)
+                    toast.success(t.copyRefreshToken)
+                  }}
+                  onCopyAll={handleCopyAll}
+                  currentPage={currentPage}
+                  pageCount={pageCount}
+                  pageSize={pageSize}
+                  totalCount={filteredMailList.length}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+                />
+              </div>
+            </main>
           </div>
-        </main>
+        </div>
       </div>
 
       <Modals 
         t={t}
         pasteVisible={pasteVisible}
         setPasteVisible={setPasteVisible}
+        splitSymbol={splitSymbol}
         pasteContent={pasteContent}
         setPasteContent={setPasteContent}
         onPasteImport={handlePasteImport}
@@ -462,6 +521,7 @@ export default function App() {
         setTagVisible={setTagVisible}
         tagMode={tagMode}
         tagRow={tagRow}
+        tagTarget={tagTarget}
         tagExisting={tagExisting}
         setTagExisting={setTagExisting}
         tagNew={tagNew}
@@ -472,7 +532,7 @@ export default function App() {
         setEmailListVisible={setEmailListVisible}
         postList={postList}
         postLoading={postLoading}
-        postTitle={nowPostEmail ? (boxType === "INBOX" ? t.inboxTitle(nowPostEmail.email) : t.junkTitle(nowPostEmail.email)) : ""}
+        postTitle={nowPostEmail ? (boxType === INBOX_MAILBOX ? t.inboxTitle(nowPostEmail.email) : t.junkTitle(nowPostEmail.email)) : ""}
         onReceive={handleReceive}
         onCancelReceive={cancelReceive}
         onClear={handleClearBox}

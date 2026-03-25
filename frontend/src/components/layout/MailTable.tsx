@@ -15,6 +15,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -51,7 +54,8 @@ interface MailTableProps {
   onToggleEmail: (email: string, checked: boolean) => void
   onEdit: (email: Email) => void
   onAddTag: (email: Email) => void
-  onRemoveTag: (email: Email) => void
+  onRemoveTag: (email: Email, tag?: string) => void
+  onRenameTag: (email: Email, tag: string) => void
   onInbox: (email: Email) => void
   onJunk: (email: Email) => void
   onDelete: (email: Email) => void
@@ -76,6 +80,7 @@ export function MailTable({
   onEdit,
   onAddTag,
   onRemoveTag,
+  onRenameTag,
   onInbox,
   onJunk,
   onDelete,
@@ -93,10 +98,10 @@ export function MailTable({
   const isAllSelected = emails.length > 0 && emails.every((e) => selectedEmails.includes(e.email))
 
   return (
-    <div className="flex flex-col h-full bg-card rounded-md shadow-sm border m-4 overflow-hidden">
+    <div className="neon-divider m-4 flex h-full flex-col overflow-hidden rounded-[26px] border bg-[linear-gradient(180deg,rgba(19,9,34,0.24),rgba(10,6,20,0.1))] shadow-[0_24px_60px_rgba(0,0,0,0.16)]">
       <div className="flex-1 overflow-auto custom-scrollbar">
         <Table>
-          <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
+          <TableHeader className="neon-divider sticky top-0 z-10 border-b bg-[linear-gradient(180deg,rgba(31,14,53,0.34),rgba(18,10,34,0.16))] shadow-sm">
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-[50px]">
                 <Checkbox
@@ -125,7 +130,7 @@ export function MailTable({
               emails.map((email, idx) => (
                 <ContextMenu key={email.email}>
                   <ContextMenuTrigger asChild>
-                    <TableRow className="group hover:bg-muted/30 transition-colors cursor-context-menu">
+                    <TableRow className="group cursor-context-menu border-white/6 transition-colors hover:bg-white/6">
                       <TableCell>
                         <Checkbox
                           checked={selectedEmails.includes(email.email)}
@@ -157,9 +162,29 @@ export function MailTable({
                             <span className="text-muted-foreground/30 text-xs">-</span>
                           ) : (
                             email.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary" className="px-2 py-0 text-[10px] font-medium bg-secondary/50 text-secondary-foreground ring-1 ring-border/50">
-                                {tag}
-                              </Badge>
+                              <DropdownMenu key={tag}>
+                                <DropdownMenuTrigger asChild>
+                                  <button type="button" className="outline-none">
+                                    <Badge variant="secondary" className="cursor-pointer rounded-full bg-[linear-gradient(90deg,rgba(244,227,255,0.92),rgba(217,181,255,0.86))] px-2 py-0 text-[10px] font-medium text-[#53106e] ring-1 ring-white/40 transition-colors hover:brightness-105">
+                                      {tag}
+                                    </Badge>
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="w-48 p-1.5">
+                                  <DropdownMenuLabel className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    {tag}
+                                  </DropdownMenuLabel>
+                                  <DropdownMenuItem onClick={() => onAddTag(email)} className="gap-2.5 py-2">
+                                    <TagIcon className="h-4 w-4 text-green-500" /> {t.addTag}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => onRenameTag(email, tag)} className="gap-2.5 py-2">
+                                    <Edit2 className="h-4 w-4 text-blue-500" /> {t.renameTag}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => onRemoveTag(email, tag)} className="gap-2.5 py-2">
+                                    <TagIcon className="h-4 w-4 text-red-500" /> {t.removeTag}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             ))
                           )}
                         </div>
@@ -187,7 +212,7 @@ export function MailTable({
                           
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white/70 hover:bg-white/10 hover:text-white">
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -206,9 +231,34 @@ export function MailTable({
                               <DropdownMenuItem onClick={() => onAddTag(email)} className="gap-2.5 py-2">
                                 <TagIcon className="h-4 w-4 text-green-500" /> {t.addTag}
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => onRemoveTag(email)} className="gap-2.5 py-2">
-                                <TagIcon className="h-4 w-4 text-red-500" /> {t.removeTag}
-                              </DropdownMenuItem>
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger className="gap-2.5 py-2">
+                                  <TagIcon className="h-4 w-4 text-red-500" /> {t.tags}
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent className="w-48 p-1.5">
+                                  {email.tags.length === 0 ? (
+                                    <DropdownMenuItem disabled className="gap-2.5 py-2">
+                                      <TagIcon className="h-4 w-4 text-muted-foreground" /> {t.noAvailableTags}
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    email.tags.map((tag) => (
+                                      <DropdownMenuSub key={tag}>
+                                        <DropdownMenuSubTrigger className="gap-2.5 py-2">
+                                          <TagIcon className="h-4 w-4 text-muted-foreground" /> {tag}
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuSubContent className="w-44 p-1.5">
+                                          <DropdownMenuItem onClick={() => onRenameTag(email, tag)} className="gap-2.5 py-2">
+                                            <Edit2 className="h-4 w-4 text-blue-500" /> {t.renameTag}
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => onRemoveTag(email, tag)} className="gap-2.5 py-2">
+                                            <TagIcon className="h-4 w-4 text-red-500" /> {t.removeTag}
+                                          </DropdownMenuItem>
+                                        </DropdownMenuSubContent>
+                                      </DropdownMenuSub>
+                                    ))
+                                  )}
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
                               <DropdownMenuSeparator className="my-1.5" />
                               <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1.5">{t.copy}</DropdownMenuLabel>
                               <DropdownMenuItem onClick={() => onCopyEmail(email.email)} className="gap-2.5 py-2">
@@ -253,12 +303,12 @@ export function MailTable({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between p-4 border-t bg-muted/20">
+      <div className="flex items-center justify-between border-t border-white/10 bg-black/18 p-4">
         <div className="flex items-center gap-4">
           <p className="text-sm font-medium text-muted-foreground whitespace-nowrap">
             {t.total}: <span className="text-foreground font-bold">{totalCount}</span>
           </p>
-          <div className="flex items-center gap-2 bg-background p-1 rounded-md border shadow-sm">
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/25 p-1 shadow-sm">
             <Select value={pageSize.toString()} onValueChange={(v) => onPageSizeChange(parseInt(v))}>
               <SelectTrigger className="h-8 w-[80px] border-none shadow-none focus:ring-0 text-xs font-semibold">
                 <SelectValue />
@@ -282,7 +332,7 @@ export function MailTable({
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="flex items-center justify-center min-w-[100px] h-9 bg-background border rounded-md px-3 shadow-sm">
+          <div className="flex h-9 min-w-[100px] items-center justify-center rounded-xl border border-white/10 bg-black/25 px-3 shadow-sm">
              <span className="text-sm font-bold text-primary mr-1">{currentPage}</span>
              <span className="text-sm text-muted-foreground">/ {pageCount}</span>
           </div>

@@ -1,43 +1,86 @@
-# Repository Guidelines & Standards
+# MS-Mail-Manager Agent Guide
 
-## 🏗️ Technical Architecture
+This repository is a Wails desktop app for managing Microsoft / Outlook accounts, importing account lists, organizing tags and tabs, and fetching `Inbox` plus `Junk` mail through Microsoft Graph.
 
-### Backend (Go)
-- **main.go:** Application entry and Wails configuration.
-- **app.go:** Core lifecycle management and frontend-bound methods.
-- **app_mail.go:** Implementation of Microsoft Graph API logic.
-- **storage.go / sqlite_storage.go:** SQLite-based persistence layer with migration support.
+## Product Snapshot
 
-### Frontend (React + TypeScript)
-- **Framework:** Refactored into a modular component-based architecture.
-- **Hooks:** All business logic resides in `src/hooks/useMailManager.ts`.
-- **Components:** 
-  - `src/components/layout/`: Functional layout parts (Navbar, Sidebar, etc.).
-  - `src/components/ui/`: Standardized, accessible shadcn/ui components.
-- **Styling:** Utility-first CSS using Tailwind CSS 4.
+- **Desktop shell:** Wails v2
+- **Backend:** Go
+- **Frontend:** React + TypeScript
+- **State & storage:** SQLite-backed local persistence
+- **Design direction:** dark cyber-purple glass UI with bundled background art and custom app icon
 
-## 🚀 Development Workflow
+## Repo Map
 
-1. **Local Dev:** Use `wails dev` for full-stack feedback.
-2. **UI Iteration:** Use `cd frontend && npm run dev` for rapid styling.
-3. **Verification:** Always run `cd frontend && npm run build` before committing to ensure TypeScript safety.
-4. **Backend Testing:** Run `go test ./...` to verify storage and parsing logic.
+### Backend
 
-## ✍️ Coding Standards
+- `main.go`: Wails bootstrap and application wiring
+- `app.go`: lifecycle hooks and frontend-bound methods
+- `app_mail.go`: Microsoft Graph mail fetch and mailbox handling
+- `storage.go`, `sqlite_storage.go`: persistence and migrations
 
-- **Clarity:** Prefer descriptive variable names over brevity.
-- **Modularity:** Keep components under 200 lines. Extract complex logic into hooks or utils.
-- **Typing:** Strict TypeScript usage. Avoid `any` at all costs.
-- **Styling:** Follow shadcn/ui patterns for consistency and accessibility.
-- **I18n:** All UI strings must be added to `src/i18n/translations.ts`.
+### Frontend
 
-## 🔐 Security & Data Handling
+- `frontend/src/App.tsx`: top-level orchestration for dialogs, mailbox flows, and page layout
+- `frontend/src/hooks/useMailManager.ts`: core state management and backend bridge
+- `frontend/src/components/layout/`: shell components such as navbar, sidebar, toolbar, table, and modals
+- `frontend/src/components/ui/`: shared shadcn/ui building blocks
+- `frontend/src/i18n/translations.ts`: all user-facing copy
+- `frontend/src/assets/`: bundled art assets such as `BG.jpg` and `icon.jpg`
+- `frontend/src/style.css`: theme tokens, neon borders, and global styling overrides
 
-- **Tokens:** Refresh tokens and account data are sensitive. Never include them in logs or commits.
-- **Transport:** Use `POST` payloads for any sensitive data passing between the Go backend and React frontend.
-- **Persistence:** Ensure `app.db` and other local state files are correctly ignored by Git.
+## Current UX Behaviors
 
-## 🧪 Commit Standards
+- `Fetch New Mail` refreshes both `Inbox` and `Junk` while preserving separate mailbox views.
+- Tag badges open per-tag actions such as add, rename, and remove.
+- Paste import supports richer guidance and validation before import.
+- The tag filter is a custom UI, not a native browser multi-select.
 
-- Use descriptive, scoped commit messages (e.g., `feat(ui): implement collapsible sidebar`).
-- Ensure all dependencies are updated and `go mod tidy` has been run.
+## Working Rules
+
+- Keep business logic in hooks, utilities, or backend methods. Do not let layout components become state blobs.
+- Keep TypeScript strict. Do not introduce `any`.
+- Add every new UI string to `frontend/src/i18n/translations.ts`.
+- Preserve the existing visual language unless the task explicitly asks for a redesign.
+- Treat refresh tokens, account rows, and imported payloads as sensitive data. Do not log them.
+- Prefer small targeted edits over broad rewrites in shared files.
+
+## Development Commands
+
+```bash
+# Full desktop development
+wails dev
+
+# Frontend-only iteration
+cd frontend && npm run dev
+
+# TypeScript / production bundle verification
+cd frontend && npm run build
+
+# Backend verification
+go test ./...
+
+# Desktop production build
+wails build
+```
+
+## Verification Standard
+
+Before closing work:
+
+1. Run `cd frontend && npm run build` for frontend-affecting changes.
+2. Run `go test ./...` for backend or shared logic changes.
+3. Run `wails build` when changing desktop packaging, icons, or bundled assets.
+4. Do not claim a fix without command evidence.
+
+## Documentation Standard
+
+- `README.md` is the external entry point. Keep it product-facing and accurate.
+- `AGENTS.md` is the collaborator contract. Keep it operational and concise.
+- If features, commands, or architecture change, update the relevant doc in the same branch.
+
+## Commit Standard
+
+- Use scoped commit messages such as `feat(ui): improve paste import modal`.
+- Do not commit secrets, local databases, or transient caches.
+- If you generate build assets intentionally, make sure they are reproducible and relevant to the shipped app.

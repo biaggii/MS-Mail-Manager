@@ -59,6 +59,7 @@ export type Translations = {
   edit: string
   addTag: string
   removeTag: string
+  renameTag: string
   copy: string
   copyEmailAddress: string
   copyRefreshToken: string
@@ -66,11 +67,13 @@ export type Translations = {
   removeEmail: string
   editMailInfo: string
   existingTag: string
+  currentTag: string
   newTag: string
   applyTag: string
   noAvailableTags: string
   tagAddFor: (email: string) => string
   tagRemoveFor: (email: string) => string
+  tagRenameFor: (email: string) => string
   inbox: string
   junk: string
   delete: string
@@ -78,6 +81,16 @@ export type Translations = {
   prev: string
   next: string
   pasteImportTitle: string
+  pasteImportDescription: string
+  pasteImportFormatTitle: string
+  pasteImportFormatHint: (separator: string) => string
+  pasteImportExample: (separator: string) => string
+  pasteImportRows: (count: number) => string
+  pasteImportValid: (count: number) => string
+  pasteImportInvalid: (count: number) => string
+  pasteImportDuplicates: (count: number) => string
+  pasteImportTextareaPlaceholder: (separator: string) => string
+  importAccounts: (count: number) => string
   cancel: string
   import: string
   editTitle: string
@@ -164,6 +177,7 @@ export const translations: Record<Lang, Translations> = {
     edit: "Edit",
     addTag: "Tag+",
     removeTag: "Tag-",
+    renameTag: "Rename Tag",
     copy: "Copy",
     copyEmailAddress: "Copy Email",
     copyRefreshToken: "Copy Refresh Token",
@@ -171,11 +185,13 @@ export const translations: Record<Lang, Translations> = {
     removeEmail: "Remove Email",
     editMailInfo: "Edit Mail Info",
     existingTag: "Existing tag",
+    currentTag: "Current tag",
     newTag: "New tag",
     applyTag: "Apply",
     noAvailableTags: "No tags available",
     tagAddFor: (email) => `Add tag for ${email}`,
     tagRemoveFor: (email) => `Remove tag for ${email}`,
+    tagRenameFor: (email) => `Rename tag for ${email}`,
     inbox: "Inbox",
     junk: "Junk",
     delete: "Delete",
@@ -183,6 +199,16 @@ export const translations: Record<Lang, Translations> = {
     prev: "prev",
     next: "next",
     pasteImportTitle: "Paste Import",
+    pasteImportDescription: "Paste one account per line. We will parse the rows before import.",
+    pasteImportFormatTitle: "Expected format",
+    pasteImportFormatHint: (separator) => `Each row should be: email${separator}password${separator}clientID${separator}refreshToken`,
+    pasteImportExample: (separator) => `name@example.com${separator}password123${separator}client-id${separator}refresh-token`,
+    pasteImportRows: (count) => `${count} rows`,
+    pasteImportValid: (count) => `${count} valid`,
+    pasteImportInvalid: (count) => `${count} invalid`,
+    pasteImportDuplicates: (count) => `${count} duplicates`,
+    pasteImportTextareaPlaceholder: (separator) => `Paste one mailbox per line\n\nExample:\nname@example.com${separator}password123${separator}client-id${separator}refresh-token`,
+    importAccounts: (count) => `Import ${count} Accounts`,
     cancel: "Cancel",
     import: "Import",
     editTitle: "Edit",
@@ -267,6 +293,7 @@ export const translations: Record<Lang, Translations> = {
     edit: "編輯",
     addTag: "加標籤",
     removeTag: "減標籤",
+    renameTag: "改標籤",
     copy: "複製",
     copyEmailAddress: "複製郵箱",
     copyRefreshToken: "複製刷新令牌",
@@ -274,11 +301,13 @@ export const translations: Record<Lang, Translations> = {
     removeEmail: "刪除郵箱",
     editMailInfo: "編輯郵箱資訊",
     existingTag: "現有標籤",
+    currentTag: "目前標籤",
     newTag: "新標籤",
     applyTag: "套用",
     noAvailableTags: "暫無可選標籤",
     tagAddFor: (email) => `為 ${email} 新增標籤`,
     tagRemoveFor: (email) => `為 ${email} 移除標籤`,
+    tagRenameFor: (email) => `為 ${email} 重新命名標籤`,
     inbox: "收件箱",
     junk: "垃圾箱",
     delete: "刪除",
@@ -286,6 +315,16 @@ export const translations: Record<Lang, Translations> = {
     prev: "prev",
     next: "next",
     pasteImportTitle: "貼上匯入",
+    pasteImportDescription: "每行貼上一個帳號，系統會先解析格式再匯入。",
+    pasteImportFormatTitle: "格式要求",
+    pasteImportFormatHint: (separator) => `每行格式：email${separator}password${separator}clientID${separator}refreshToken`,
+    pasteImportExample: (separator) => `name@example.com${separator}password123${separator}client-id${separator}refresh-token`,
+    pasteImportRows: (count) => `${count} 行`,
+    pasteImportValid: (count) => `${count} 條有效`,
+    pasteImportInvalid: (count) => `${count} 條無效`,
+    pasteImportDuplicates: (count) => `${count} 條重複`,
+    pasteImportTextareaPlaceholder: (separator) => `每行貼上一個郵箱帳號\n\n例如：\nname@example.com${separator}password123${separator}client-id${separator}refresh-token`,
+    importAccounts: (count) => `匯入 ${count} 個帳號`,
     cancel: "取消",
     import: "匯入",
     editTitle: "編輯",
