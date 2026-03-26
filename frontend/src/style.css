@@ -49,22 +49,22 @@
     --radius: 0.875rem;
     --background: oklch(0.15 0.03 300);
     --foreground: oklch(0.97 0.01 300);
-    --card: oklch(0.2 0.025 300 / 0.72);
+    --card: oklch(0.18 0.03 300 / 0.84);
     --card-foreground: oklch(0.97 0.01 300);
-    --popover: oklch(0.18 0.03 300 / 0.92);
+    --popover: oklch(0.16 0.035 300 / 0.96);
     --popover-foreground: oklch(0.97 0.01 300);
     --primary: oklch(0.74 0.24 318);
     --primary-foreground: oklch(0.13 0.03 300);
-    --secondary: oklch(0.27 0.03 292 / 0.88);
+    --secondary: oklch(0.23 0.035 292 / 0.94);
     --secondary-foreground: oklch(0.95 0.01 300);
-    --muted: oklch(0.24 0.018 295 / 0.8);
-    --muted-foreground: oklch(0.77 0.03 300);
+    --muted: oklch(0.19 0.02 295 / 0.86);
+    --muted-foreground: oklch(0.88 0.03 300);
     --accent: oklch(0.31 0.06 304 / 0.95);
     --accent-foreground: oklch(0.98 0.01 300);
     --destructive: oklch(0.68 0.23 22);
-    --border: oklch(0.8 0.29 322 / 0.62);
-    --input: oklch(0.66 0.2 314 / 0.46);
-    --ring: oklch(0.84 0.31 324 / 0.9);
+    --border: oklch(0.83 0.3 322 / 0.9);
+    --input: oklch(0.74 0.24 318 / 0.7);
+    --ring: oklch(0.86 0.32 324 / 0.98);
     --chart-1: oklch(0.74 0.24 318);
     --chart-2: oklch(0.72 0.19 268);
     --chart-3: oklch(0.79 0.18 348);
@@ -122,6 +122,9 @@
     @apply bg-background text-foreground;
     min-height: 100vh;
     font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     }
 }
 
@@ -156,25 +159,34 @@ body,
 
 @layer base {
   .neon-divider {
-    border-color: color-mix(in oklab, var(--primary) 86%, white 14%);
+    border-color: color-mix(in oklab, var(--primary) 88%, white 12%);
     box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--primary) 60%, transparent),
-      0 0 14px color-mix(in oklab, var(--primary) 40%, transparent),
-      0 0 30px color-mix(in oklab, var(--primary) 22%, transparent);
+      inset 0 0 0 1px color-mix(in oklab, var(--primary) 30%, white 10%),
+      0 0 0 1px color-mix(in oklab, var(--primary) 78%, transparent),
+      0 0 12px color-mix(in oklab, var(--primary) 44%, transparent),
+      0 0 26px color-mix(in oklab, var(--primary) 24%, transparent);
   }
 
   [data-slot="table-row"] {
-    border-color: color-mix(in oklab, var(--primary) 48%, transparent);
-    box-shadow: inset 0 1px 0 color-mix(in oklab, var(--primary) 12%, transparent);
+    border-color: color-mix(in oklab, var(--primary) 62%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in oklab, var(--primary) 22%, transparent);
   }
 
   [data-slot="table-header"] > tr,
   [data-slot="table-header"] tr,
   [data-slot="separator"] {
-    border-color: color-mix(in oklab, var(--primary) 82%, white 10%);
-    background: color-mix(in oklab, var(--primary) 82%, white 10%);
+    border-color: color-mix(in oklab, var(--primary) 90%, white 10%);
+    background: color-mix(in oklab, var(--primary) 90%, white 10%);
     box-shadow:
-      0 0 10px color-mix(in oklab, var(--primary) 34%, transparent),
-      0 0 20px color-mix(in oklab, var(--primary) 18%, transparent);
+      0 0 10px color-mix(in oklab, var(--primary) 40%, transparent),
+      0 0 20px color-mix(in oklab, var(--primary) 24%, transparent);
+  }
+
+  input,
+  textarea,
+  button,
+  [role="combobox"],
+  [data-slot="select-trigger"] {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   }
 }
